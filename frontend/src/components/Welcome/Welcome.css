@@ -1,0 +1,33 @@
+.welcome {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.welcome h1 {
+  font-size: 48px;
+  font-weight: 600;
+  color: #37352f;
+  letter-spacing: -0.02em;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.char {
+  display: inline-block;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Responsive - Mobile */
+@media (max-width: 768px) {
+  .welcome h1 {
+    font-size: 32px;
+  }
+}
