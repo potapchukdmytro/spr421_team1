@@ -22,6 +22,7 @@ package-lock.json
 .next/
 /out/
 public/build/
+.vite/
 
 # macOS
 .DS_Store
