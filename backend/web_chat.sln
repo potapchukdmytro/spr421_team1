@@ -1,9 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36414.22 d17.14
+VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "web_chat", "web_chat\web_chat.csproj", "{6B32F76D-1EF6-4489-BDC1-7C4DA4B50E8E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "web_chat.BLL", "..\..\..\..\source\repos\web_chat\web_chat.BLL\web_chat.BLL.csproj", "{6A52C03E-4FD1-077D-49DA-5C3FC7369F3F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "web_chat.DAL", "..\..\..\..\source\repos\web_chat\web_chat.DAL\web_chat.DAL.csproj", "{773D0B04-CB7D-4BBE-1F22-37D908BC986D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +19,14 @@ Global
 		{6B32F76D-1EF6-4489-BDC1-7C4DA4B50E8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6B32F76D-1EF6-4489-BDC1-7C4DA4B50E8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6B32F76D-1EF6-4489-BDC1-7C4DA4B50E8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6A52C03E-4FD1-077D-49DA-5C3FC7369F3F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6A52C03E-4FD1-077D-49DA-5C3FC7369F3F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6A52C03E-4FD1-077D-49DA-5C3FC7369F3F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6A52C03E-4FD1-077D-49DA-5C3FC7369F3F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{773D0B04-CB7D-4BBE-1F22-37D908BC986D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{773D0B04-CB7D-4BBE-1F22-37D908BC986D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{773D0B04-CB7D-4BBE-1F22-37D908BC986D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{773D0B04-CB7D-4BBE-1F22-37D908BC986D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
