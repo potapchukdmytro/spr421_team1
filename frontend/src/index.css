@@ -1,5 +1,47 @@
-/* ! Global Styles - Глобальні стилі як у https://www.notion.com/ */
+/* ========================================= */
+/* ГОЛОВНА ПАЛІТРА ТА СТИЛІ  */
+/* ========================================= */
 
+:root {
+  /* --- Шрифт  --- */
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+
+  /* ! --- 1. Основні кольори бренду (витягнуто з Welcome.css можеш дивитися туди якщо не знаєш які кольори брати ) --- */
+  --brand-primary: #37352f;        /* Основний темний (Notion-black) */
+  --brand-primary-dark: #1f1d1a;   /* Темніший для :hover */
+  --brand-text-on-primary: #ffffff; /* Білий текст на темних кнопках */
+
+  /* --- 2. Текстові кольори --- */
+  --text-primary: #37352f;                 /* Основний текст (той самий, що і бренд) */
+  --text-secondary: rgba(55, 53, 47, 0.65); /* Підзаголовок в Welcome */
+  --text-tertiary: rgba(55, 53, 47, 0.5);  /* "Credits" текст */
+  --text-link: rgba(55, 53, 47, 0.7);      /* "Credits" посилання */
+  --text-link-hover: #37352f;              /* "Credits" посилання :hover */
+
+  /* --- 3. Фонові кольори --- */
+  --background-light: #ffffff;      /* Основний фон body */
+  --surface-color: #FAFAFA;       /* Фон для інпутів (з Login.css) */
+  --surface-hover: rgba(55, 53, 47, 0.06); /* :hover для вторинної кнопки */
+  --background-gradient-start: #fdfdfd; /* Градієнт на Welcome */
+  --background-gradient-end: #f9f9f9;   /* Градієнт на Welcome */
+
+  /* --- 4. Кольори рамок (Borders) --- */
+  --border-color: rgba(55, 53, 47, 0.16);  /* Вторинна кнопка */
+  --border-color-light: rgba(55, 53, 47, 0.15); /* "Credits" посилання */
+  --border-color-focus-ring: rgba(55, 53, 47, 0.1); /* "Glow" ефект для інпутів */
+
+  /* --- 5. Кольори для станів (Status Colors) --- */
+  --status-success: #4CAF50;
+  --status-warning: #FFC107;
+  --status-error: #F44336;
+
+  /* --- 6. Інші UI змінні --- */
+  --border-radius-main: 6px;  /* Notion-стиль (менш круглий) */
+  --box-shadow-main: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+
+/* Global Styles - Notion style (Твої стилі) */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -7,8 +49,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica', 'Apple Color Emoji', sans-serif;
-  color: #37352f;
-  background-color: #ffffff;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background-color: var(--background-light);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
