@@ -1,6 +1,11 @@
 namespace web_chat.DAL.Entities
 {
-    public abstract class BaseEntity
+    public interface IBaseEntity
+    {
+        string Id { get; set; }
+        DateTime CreatedDate { get; set; }
+    }
+    public abstract class BaseEntity : IBaseEntity
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
