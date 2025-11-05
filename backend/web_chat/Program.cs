@@ -9,7 +9,6 @@ using web_chat.DAL.Settings;
 using web_chat.DAL.Extensions;
 using web_chat.DAL.Seeders;
 using web_chat.BLL.Services.Auth;
-using web_chat.BLL.Services.Email;
 using web_chat.BLL.Settings;
 using System.Text;
 
@@ -67,7 +66,6 @@ builder.Services
 
 // Custom services
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Add database seeders
 builder.Services.AddDatabaseSeeders();

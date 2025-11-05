@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using web_chat.BLL.Dtos.Auth;
 using web_chat.BLL.Settings;
-using web_chat.BLL.Services.Email;
 using web_chat.DAL.Entities;
 using web_chat.DAL.Settings;
 using System.IdentityModel.Tokens.Jwt;
@@ -18,13 +17,11 @@ namespace web_chat.BLL.Services.Auth
     {
         private readonly UserManager<UserEntity> _userManager;
         private readonly JwtSettings _jwtSettings;
-        private readonly IEmailService _emailService;
 
-        public AuthService(UserManager<UserEntity> userManager, IOptions<JwtSettings> jwtOptions, IEmailService emailService)
+        public AuthService(UserManager<UserEntity> userManager, IOptions<JwtSettings> jwtOptions)
         {
             _userManager = userManager;
             _jwtSettings = jwtOptions.Value;
-            _emailService = emailService;
         }
 
         public async Task<ServiceResponse> LoginAsync(LoginDto dto)
@@ -97,13 +94,6 @@ namespace web_chat.BLL.Services.Auth
             }
 
             await _userManager.AddToRoleAsync(user, RoleSettings.RoleUser);
-
-            // Send welcome email (best-effort)
-            try
-            {
-                await _emailService.SendAsync(user.Email!, "Welcome to Spotify Clone", $"<h3>Hello, {user.UserName}!</h3><p>Thanks for registering.</p>");
-            }
-            catch { /* ignore email failures */ }
 
             string token = await GenerateJwtTokenAsync(user);
             return new ServiceResponse
