@@ -1,10 +1,17 @@
-﻿namespace web_chat.DAL.Entities
+using System.ComponentModel.DataAnnotations;
+
+namespace web_chat.DAL.Entities
 {
     public class RoomEntity : BaseEntity
     {
-        public required string Name { get; set; }
-        public required bool IsPrivate { get; set; }
-        public ICollection<UserRoomEntity> UserRooms { get; set; } = [];
-        public ICollection<MessageEntity> Messages { get; set; } = [];
+        [Required]
+        [MaxLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        public bool IsPrivate { get; set; } = false;
+
+        // Navigation properties
+        public virtual ICollection<MessageEntity> Messages { get; set; } = [];
+        public virtual ICollection<UserRoomEntity> UserRooms { get; set; } = [];
     }
 }

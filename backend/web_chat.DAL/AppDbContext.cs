@@ -1,88 +1,123 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using web_chat.DAL.Entities;
+using web_chat.DAL.Entities.Identity;
 
 namespace web_chat.DAL
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext : IdentityDbContext<UserEntity, ApplicationRole, string>
     {
-        public AppDbContext(DbContextOptions options) : base(options) { }
-
-        public DbSet<MessageEntity> Messages { get; set; }
-        public DbSet<UserEntity> Users { get; set; }
-        public DbSet<RoomEntity> Rooms { get; set; }
-        public DbSet<UserRoomEntity> UserRooms { get; set; }
-
-        protected override void OnModelCreating(ModelBuilder builder)
+        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
         {
-            base.OnModelCreating(builder);
+        }
 
-            builder.Entity<UserEntity>(e =>
+        // DbSets for chat entities
+        public DbSet<RoomEntity> Rooms { get; set; } = null!;
+        public DbSet<MessageEntity> Messages { get; set; } = null!;
+        public DbSet<UserRoomEntity> UserRooms { get; set; } = null!;
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Rename Identity tables to simpler names
+            modelBuilder.Entity<UserEntity>().ToTable("Users");
+            modelBuilder.Entity<ApplicationRole>().ToTable("Roles");
+
+            // Configure Identity relationships to avoid shadow properties
+            ConfigureIdentityRelationships(modelBuilder);
+            
+            ConfigureRoomEntity(modelBuilder);
+            ConfigureMessageEntity(modelBuilder);
+            ConfigureUserRoomEntity(modelBuilder);
+        }
+
+        private void ConfigureIdentityRelationships(ModelBuilder modelBuilder)
+        {
+            // Configure ApplicationUserRole
+            modelBuilder.Entity<ApplicationUserRole>(entity =>
             {
-                e.HasKey(u => u.Id);
-                e.Property(u => u.UserName)
-                .IsRequired()
-                .HasMaxLength(100);
-                e.Property(u => u.UserEmail)
-                .IsRequired()
-                .HasMaxLength(200);
-                e.HasIndex(u => u.UserEmail)
-                .IsUnique();
+                entity.HasOne(ur => ur.User)
+                    .WithMany(u => u.UserRoles)
+                    .HasForeignKey(ur => ur.UserId);
 
-                // one-to-many: User - Messages
-                e.HasMany(u => u.Messages)
-                .WithOne(m => m.User)
-                .HasForeignKey(m => m.UserId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-                // one-to-many: User - UserRooms
-                e.HasMany(u => u.UserRooms)
-                .WithOne(ur => ur.User)
-                .HasForeignKey(ur => ur.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(ur => ur.Role)
+                    .WithMany(r => r.UserRoles)
+                    .HasForeignKey(ur => ur.RoleId);
             });
 
-            builder.Entity<MessageEntity>(e =>
+            // Configure ApplicationRoleClaim
+            modelBuilder.Entity<ApplicationRoleClaim>(entity =>
             {
-                e.HasKey(m => m.Id);
-                e.Property(m => m.Text)
-                .IsRequired();
-                e.Property(m => m.SentAt)
-                .IsRequired()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.HasOne(rc => rc.Role)
+                    .WithMany(r => r.RoleClaims)
+                    .HasForeignKey(rc => rc.RoleId);
             });
 
-            builder.Entity<RoomEntity>(e =>
+            // Configure ApplicationUserClaim
+            modelBuilder.Entity<ApplicationUserClaim>(entity =>
             {
-                e.HasKey(r => r.Id);
-                e.Property(r => r.Name)
-                .IsRequired()
-                .HasMaxLength(100);
-                e.Property(r => r.IsPrivate)
-                .IsRequired();
-
-                // one-to-many: Room - Messages
-                e.HasMany(r => r.Messages)
-                .WithOne(m => m.Room)
-                .HasForeignKey(m => m.RoomId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-                // one-to-many: Room - UserRooms
-                e.HasMany(r => r.UserRooms)
-                .WithOne(ur => ur.Room)
-                .HasForeignKey(ur => ur.RoomId)
-                .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(uc => uc.User)
+                    .WithMany(u => u.Claims)
+                    .HasForeignKey(uc => uc.UserId);
             });
 
-            builder.Entity<UserRoomEntity>(e =>
+            // Configure ApplicationUserLogin
+            modelBuilder.Entity<ApplicationUserLogin>(entity =>
             {
-                e.HasKey(ur => ur.Id);
-                e.Property(ur => ur.JoinedAt)
-                .IsRequired()
-                .HasDefaultValueSql("CURRENT_TIMESTAMP");
-                e.Property(ur => ur.IsAdmin)
-                .IsRequired();
-                e.Property(ur => ur.IsBanned)
-                .IsRequired();
+                entity.HasOne(ul => ul.User)
+                    .WithMany(u => u.Logins)
+                    .HasForeignKey(ul => ul.UserId);
+            });
+
+            // Configure ApplicationUserToken
+            modelBuilder.Entity<ApplicationUserToken>(entity =>
+            {
+                entity.HasOne(ut => ut.User)
+                    .WithMany(u => u.Tokens)
+                    .HasForeignKey(ut => ut.UserId);
+            });
+        }
+
+        private void ConfigureRoomEntity(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<RoomEntity>(entity =>
+            {
+                entity.Property(e => e.Name).HasMaxLength(100);
+            });
+        }
+
+        private void ConfigureMessageEntity(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<MessageEntity>(entity =>
+            {
+                entity.HasOne(e => e.User)
+                    .WithMany(u => u.Messages)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(e => e.Room)
+                    .WithMany(r => r.Messages)
+                    .HasForeignKey(e => e.RoomId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+        }
+
+        private void ConfigureUserRoomEntity(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<UserRoomEntity>(entity =>
+            {
+                entity.HasOne(e => e.User)
+                    .WithMany(u => u.UserRooms)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Room)
+                    .WithMany(r => r.UserRooms)
+                    .HasForeignKey(e => e.RoomId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => new { e.UserId, e.RoomId }).IsUnique();
             });
         }
     }

@@ -1,14 +1,21 @@
-﻿namespace web_chat.DAL.Entities
+using System.ComponentModel.DataAnnotations;
+
+namespace web_chat.DAL.Entities
 {
     public class UserRoomEntity : BaseEntity
     {
-        public required DateTime JoinedAt { get; set; } = DateTime.UtcNow;
-        public required bool IsAdmin { get; set; }
-        public required bool IsBanned { get; set; }
+        [Required]
+        public string UserId { get; set; } = string.Empty;
 
-        public string? UserId { get; set; }
-        public UserEntity? User { get; set; }
-        public string? RoomId { get; set; }
-        public RoomEntity? Room { get; set; }
+        [Required]
+        public string RoomId { get; set; } = string.Empty;
+
+        public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+        public bool IsAdmin { get; set; } = false;
+        public bool IsBanned { get; set; } = false;
+
+        // Navigation properties
+        public virtual UserEntity User { get; set; } = null!;
+        public virtual RoomEntity Room { get; set; } = null!;
     }
 }
