@@ -13,7 +13,7 @@ namespace web_chat.DAL.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "AspNetRoles",
+                name: "Roles",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
@@ -23,11 +23,25 @@ namespace web_chat.DAL.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AspNetRoles", x => x.Id);
+                    table.PrimaryKey("PK_Roles", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
-                name: "AspNetUsers",
+                name: "Rooms",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    IsPrivate = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Rooms", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Users",
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
@@ -49,21 +63,7 @@ namespace web_chat.DAL.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AspNetUsers", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Rooms",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    Name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    IsPrivate = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Rooms", x => x.Id);
+                    table.PrimaryKey("PK_Users", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -75,23 +75,17 @@ namespace web_chat.DAL.Migrations
                     RoleId = table.Column<string>(type: "text", nullable: false),
                     ClaimType = table.Column<string>(type: "text", nullable: true),
                     ClaimValue = table.Column<string>(type: "text", nullable: true),
-                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false),
-                    RoleId1 = table.Column<string>(type: "text", nullable: true)
+                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetRoleClaims", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_AspNetRoleClaims_AspNetRoles_RoleId",
+                        name: "FK_AspNetRoleClaims_Roles_RoleId",
                         column: x => x.RoleId,
-                        principalTable: "AspNetRoles",
+                        principalTable: "Roles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_AspNetRoleClaims_AspNetRoles_RoleId1",
-                        column: x => x.RoleId1,
-                        principalTable: "AspNetRoles",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -103,23 +97,17 @@ namespace web_chat.DAL.Migrations
                     UserId = table.Column<string>(type: "text", nullable: false),
                     ClaimType = table.Column<string>(type: "text", nullable: true),
                     ClaimValue = table.Column<string>(type: "text", nullable: true),
-                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false),
-                    UserId1 = table.Column<string>(type: "text", nullable: true)
+                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUserClaims", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_AspNetUserClaims_AspNetUsers_UserId",
+                        name: "FK_AspNetUserClaims_Users_UserId",
                         column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_AspNetUserClaims_AspNetUsers_UserId1",
-                        column: x => x.UserId1,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -130,23 +118,17 @@ namespace web_chat.DAL.Migrations
                     ProviderKey = table.Column<string>(type: "text", nullable: false),
                     ProviderDisplayName = table.Column<string>(type: "text", nullable: true),
                     UserId = table.Column<string>(type: "text", nullable: false),
-                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false),
-                    UserId1 = table.Column<string>(type: "text", nullable: true)
+                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUserLogins", x => new { x.LoginProvider, x.ProviderKey });
                     table.ForeignKey(
-                        name: "FK_AspNetUserLogins_AspNetUsers_UserId",
+                        name: "FK_AspNetUserLogins_Users_UserId",
                         column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_AspNetUserLogins_AspNetUsers_UserId1",
-                        column: x => x.UserId1,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -155,35 +137,23 @@ namespace web_chat.DAL.Migrations
                 {
                     UserId = table.Column<string>(type: "text", nullable: false),
                     RoleId = table.Column<string>(type: "text", nullable: false),
-                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false),
-                    UserId1 = table.Column<string>(type: "text", nullable: true),
-                    RoleId1 = table.Column<string>(type: "text", nullable: true)
+                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUserRoles", x => new { x.UserId, x.RoleId });
                     table.ForeignKey(
-                        name: "FK_AspNetUserRoles_AspNetRoles_RoleId",
+                        name: "FK_AspNetUserRoles_Roles_RoleId",
                         column: x => x.RoleId,
-                        principalTable: "AspNetRoles",
+                        principalTable: "Roles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_AspNetUserRoles_AspNetRoles_RoleId1",
-                        column: x => x.RoleId1,
-                        principalTable: "AspNetRoles",
-                        principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_AspNetUserRoles_AspNetUsers_UserId",
+                        name: "FK_AspNetUserRoles_Users_UserId",
                         column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_AspNetUserRoles_AspNetUsers_UserId1",
-                        column: x => x.UserId1,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -194,23 +164,17 @@ namespace web_chat.DAL.Migrations
                     LoginProvider = table.Column<string>(type: "text", nullable: false),
                     Name = table.Column<string>(type: "text", nullable: false),
                     Value = table.Column<string>(type: "text", nullable: true),
-                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false),
-                    UserId1 = table.Column<string>(type: "text", nullable: true)
+                    Discriminator = table.Column<string>(type: "character varying(34)", maxLength: 34, nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUserTokens", x => new { x.UserId, x.LoginProvider, x.Name });
                     table.ForeignKey(
-                        name: "FK_AspNetUserTokens_AspNetUsers_UserId",
+                        name: "FK_AspNetUserTokens_Users_UserId",
                         column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_AspNetUserTokens_AspNetUsers_UserId1",
-                        column: x => x.UserId1,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -228,15 +192,15 @@ namespace web_chat.DAL.Migrations
                 {
                     table.PrimaryKey("PK_Messages", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Messages_AspNetUsers_UserId",
-                        column: x => x.UserId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.SetNull);
-                    table.ForeignKey(
                         name: "FK_Messages_Rooms_RoomId",
                         column: x => x.RoomId,
                         principalTable: "Rooms",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_Messages_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
                 });
@@ -257,15 +221,15 @@ namespace web_chat.DAL.Migrations
                 {
                     table.PrimaryKey("PK_UserRooms", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_UserRooms_AspNetUsers_UserId",
-                        column: x => x.UserId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
                         name: "FK_UserRooms_Rooms_RoomId",
                         column: x => x.RoomId,
                         principalTable: "Rooms",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_UserRooms_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -276,25 +240,9 @@ namespace web_chat.DAL.Migrations
                 column: "RoleId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AspNetRoleClaims_RoleId1",
-                table: "AspNetRoleClaims",
-                column: "RoleId1");
-
-            migrationBuilder.CreateIndex(
-                name: "RoleNameIndex",
-                table: "AspNetRoles",
-                column: "NormalizedName",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_AspNetUserClaims_UserId",
                 table: "AspNetUserClaims",
                 column: "UserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AspNetUserClaims_UserId1",
-                table: "AspNetUserClaims",
-                column: "UserId1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetUserLogins_UserId",
@@ -302,40 +250,9 @@ namespace web_chat.DAL.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AspNetUserLogins_UserId1",
-                table: "AspNetUserLogins",
-                column: "UserId1");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_AspNetUserRoles_RoleId",
                 table: "AspNetUserRoles",
                 column: "RoleId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AspNetUserRoles_RoleId1",
-                table: "AspNetUserRoles",
-                column: "RoleId1");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AspNetUserRoles_UserId1",
-                table: "AspNetUserRoles",
-                column: "UserId1");
-
-            migrationBuilder.CreateIndex(
-                name: "EmailIndex",
-                table: "AspNetUsers",
-                column: "NormalizedEmail");
-
-            migrationBuilder.CreateIndex(
-                name: "UserNameIndex",
-                table: "AspNetUsers",
-                column: "NormalizedUserName",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AspNetUserTokens_UserId1",
-                table: "AspNetUserTokens",
-                column: "UserId1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Messages_RoomId",
@@ -348,6 +265,12 @@ namespace web_chat.DAL.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
+                name: "RoleNameIndex",
+                table: "Roles",
+                column: "NormalizedName",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_UserRooms_RoomId",
                 table: "UserRooms",
                 column: "RoomId");
@@ -356,6 +279,17 @@ namespace web_chat.DAL.Migrations
                 name: "IX_UserRooms_UserId_RoomId",
                 table: "UserRooms",
                 columns: new[] { "UserId", "RoomId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "EmailIndex",
+                table: "Users",
+                column: "NormalizedEmail");
+
+            migrationBuilder.CreateIndex(
+                name: "UserNameIndex",
+                table: "Users",
+                column: "NormalizedUserName",
                 unique: true);
         }
 
@@ -384,13 +318,13 @@ namespace web_chat.DAL.Migrations
                 name: "UserRooms");
 
             migrationBuilder.DropTable(
-                name: "AspNetRoles");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUsers");
+                name: "Roles");
 
             migrationBuilder.DropTable(
                 name: "Rooms");
+
+            migrationBuilder.DropTable(
+                name: "Users");
         }
     }
 }

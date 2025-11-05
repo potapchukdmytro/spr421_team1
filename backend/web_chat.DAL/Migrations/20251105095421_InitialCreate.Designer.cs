@@ -12,7 +12,7 @@ using web_chat.DAL;
 namespace web_chat.DAL.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251102200502_InitialCreate")]
+    [Migration("20251105095421_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -20,7 +20,7 @@ namespace web_chat.DAL.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.0")
+                .HasAnnotation("ProductVersion", "8.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -50,11 +50,9 @@ namespace web_chat.DAL.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RoleId");
-
                     b.ToTable("AspNetRoleClaims", (string)null);
 
-                    b.HasDiscriminator<string>("Discriminator").HasValue("IdentityRoleClaim<string>");
+                    b.HasDiscriminator().HasValue("IdentityRoleClaim<string>");
 
                     b.UseTphMappingStrategy();
                 });
@@ -84,11 +82,9 @@ namespace web_chat.DAL.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("AspNetUserClaims", (string)null);
 
-                    b.HasDiscriminator<string>("Discriminator").HasValue("IdentityUserClaim<string>");
+                    b.HasDiscriminator().HasValue("IdentityUserClaim<string>");
 
                     b.UseTphMappingStrategy();
                 });
@@ -115,11 +111,9 @@ namespace web_chat.DAL.Migrations
 
                     b.HasKey("LoginProvider", "ProviderKey");
 
-                    b.HasIndex("UserId");
-
                     b.ToTable("AspNetUserLogins", (string)null);
 
-                    b.HasDiscriminator<string>("Discriminator").HasValue("IdentityUserLogin<string>");
+                    b.HasDiscriminator().HasValue("IdentityUserLogin<string>");
 
                     b.UseTphMappingStrategy();
                 });
@@ -139,11 +133,9 @@ namespace web_chat.DAL.Migrations
 
                     b.HasKey("UserId", "RoleId");
 
-                    b.HasIndex("RoleId");
-
                     b.ToTable("AspNetUserRoles", (string)null);
 
-                    b.HasDiscriminator<string>("Discriminator").HasValue("IdentityUserRole<string>");
+                    b.HasDiscriminator().HasValue("IdentityUserRole<string>");
 
                     b.UseTphMappingStrategy();
                 });
@@ -171,7 +163,7 @@ namespace web_chat.DAL.Migrations
 
                     b.ToTable("AspNetUserTokens", (string)null);
 
-                    b.HasDiscriminator<string>("Discriminator").HasValue("IdentityUserToken<string>");
+                    b.HasDiscriminator().HasValue("IdentityUserToken<string>");
 
                     b.UseTphMappingStrategy();
                 });
@@ -199,7 +191,7 @@ namespace web_chat.DAL.Migrations
                         .IsUnique()
                         .HasDatabaseName("RoleNameIndex");
 
-                    b.ToTable("AspNetRoles", (string)null);
+                    b.ToTable("Roles", (string)null);
                 });
 
             modelBuilder.Entity("web_chat.DAL.Entities.MessageEntity", b =>
@@ -317,7 +309,7 @@ namespace web_chat.DAL.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
-                    b.ToTable("AspNetUsers", (string)null);
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("web_chat.DAL.Entities.UserRoomEntity", b =>
@@ -359,10 +351,7 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasBaseType("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>");
 
-                    b.Property<string>("RoleId1")
-                        .HasColumnType("text");
-
-                    b.HasIndex("RoleId1");
+                    b.HasIndex("RoleId");
 
                     b.HasDiscriminator().HasValue("ApplicationRoleClaim");
                 });
@@ -371,10 +360,7 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasBaseType("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>");
 
-                    b.Property<string>("UserId1")
-                        .HasColumnType("text");
-
-                    b.HasIndex("UserId1");
+                    b.HasIndex("UserId");
 
                     b.HasDiscriminator().HasValue("ApplicationUserClaim");
                 });
@@ -383,10 +369,7 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasBaseType("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>");
 
-                    b.Property<string>("UserId1")
-                        .HasColumnType("text");
-
-                    b.HasIndex("UserId1");
+                    b.HasIndex("UserId");
 
                     b.HasDiscriminator().HasValue("ApplicationUserLogin");
                 });
@@ -395,15 +378,7 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasBaseType("Microsoft.AspNetCore.Identity.IdentityUserRole<string>");
 
-                    b.Property<string>("RoleId1")
-                        .HasColumnType("text");
-
-                    b.Property<string>("UserId1")
-                        .HasColumnType("text");
-
-                    b.HasIndex("RoleId1");
-
-                    b.HasIndex("UserId1");
+                    b.HasIndex("RoleId");
 
                     b.HasDiscriminator().HasValue("ApplicationUserRole");
                 });
@@ -412,63 +387,7 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasBaseType("Microsoft.AspNetCore.Identity.IdentityUserToken<string>");
 
-                    b.Property<string>("UserId1")
-                        .HasColumnType("text");
-
-                    b.HasIndex("UserId1");
-
                     b.HasDiscriminator().HasValue("ApplicationUserToken");
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
-                {
-                    b.HasOne("web_chat.DAL.Entities.Identity.ApplicationRole", null)
-                        .WithMany()
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
-                {
-                    b.HasOne("web_chat.DAL.Entities.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
-                {
-                    b.HasOne("web_chat.DAL.Entities.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
-                {
-                    b.HasOne("web_chat.DAL.Entities.Identity.ApplicationRole", null)
-                        .WithMany()
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("web_chat.DAL.Entities.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
-                {
-                    b.HasOne("web_chat.DAL.Entities.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("web_chat.DAL.Entities.MessageEntity", b =>
@@ -511,7 +430,9 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasOne("web_chat.DAL.Entities.Identity.ApplicationRole", "Role")
                         .WithMany("RoleClaims")
-                        .HasForeignKey("RoleId1");
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Role");
                 });
@@ -520,7 +441,9 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasOne("web_chat.DAL.Entities.UserEntity", "User")
                         .WithMany("Claims")
-                        .HasForeignKey("UserId1");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -529,7 +452,9 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasOne("web_chat.DAL.Entities.UserEntity", "User")
                         .WithMany("Logins")
-                        .HasForeignKey("UserId1");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
@@ -538,11 +463,15 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasOne("web_chat.DAL.Entities.Identity.ApplicationRole", "Role")
                         .WithMany("UserRoles")
-                        .HasForeignKey("RoleId1");
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.HasOne("web_chat.DAL.Entities.UserEntity", "User")
                         .WithMany("UserRoles")
-                        .HasForeignKey("UserId1");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Role");
 
@@ -553,7 +482,9 @@ namespace web_chat.DAL.Migrations
                 {
                     b.HasOne("web_chat.DAL.Entities.UserEntity", "User")
                         .WithMany("Tokens")
-                        .HasForeignKey("UserId1");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
