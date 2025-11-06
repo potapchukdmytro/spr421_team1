@@ -126,7 +126,7 @@ const Welcome = () => {
         </p>
 
         <div ref={buttonsRef} className="welcome-buttons">
-          <button className="btn btn-primary">Login</button>
+          <button className="btn btn-primary" href='/LogIn'>Login</button>
           <button className="btn btn-secondary">Sign Up</button>
         </div>
       </div>

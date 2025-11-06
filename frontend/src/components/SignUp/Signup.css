@@ -1,0 +1,111 @@
+/*
+ * МІНІМАЛЬНИЙ ШАБЛОН (Login.css)
+ *
+ * Пояснення:
+ * 1. Створюй тут класи, які ти вказав у .jsx (напр., .login-title).
+ * 2. Для кольорів, рамок, тіней, шрифтів ЗАВЖДИ
+ * використовуй змінні (напр. 'var(...)') з 'index.css'.
+ */
+
+/* == Це приклад */
+.login-title {
+  /*
+   * Замість "hard-code": color: #37352f;
+   * Ми пишемо так:
+   */
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+
+  /* Інші стилі */
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-top: 250px;
+
+  text-align: center;
+}
+.input_div0{
+  margin-top: 50px;
+  align-items: center;
+  text-align: center;
+}
+.input_div{
+  margin-top: 10px;
+  align-items: center;
+  text-align: center;
+}
+.subtitle_1{
+    font-size: 20px;
+  font-weight: 400;
+  color: var(--text-secondary); /* <-- Використано змінну */
+  margin-bottom: 1px;
+  margin-right: 450px;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  transform: translateZ(0);
+}
+.subtitle_2{
+    font-size: 20px;
+  font-weight: 400;
+  color: var(--text-secondary); /* <-- Використано змінну */
+  margin-bottom: 1px;
+  margin-right: 420px;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+  transform: translateZ(0);
+}
+.email_input{
+  border: var(--border-color-focus-ring);
+  border: 1px solid var(--border-color);
+  background-color: var(--surface-color);
+  border-radius: var(--border-radius-main);
+  width: 500px;
+  height: 60px;
+  padding-left: 10px;
+}
+.input_div2{
+   margin-top: 10px;
+  align-items: center;
+  text-align: center;
+}
+.button_conteiner{
+  align-items: center;
+}
+.button_log{
+  align-items: center;
+    padding: 10px 150px;
+  font-size: 15px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--border-radius-main); /* <-- Використано змінну */
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  margin-top: 50px;
+  margin-left: 790px;
+  background-color: var( --brand-primary);
+  color:var(--brand-text-on-primary) ;
+}
+.registr_acc{
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 10px;
+}
+.credits{
+  color:var(--text-link-hover);
+  text-decoration: none; 
+  font-weight: 500;
+}
+/*
+ * ============================================
+ * == НАВІГАЦІЯ  ==
+ * ============================================
+ *
+ * Тепер, за аналогією, додай сюди стилі для
+ * решти компонентів з Trello:
+ *
+ * .login-label { ... }
+ * .login-input { ... }
+ * .login-button { ... }
+ * .login-page-wrapper { ... }
+ *
+ */
