@@ -1,5 +1,5 @@
 import './App.css'
-import Login from './components/LogIn/Login'
+import Login from './components/Login/Login'
 import Welcome from './components/Welcome/Welcome'
 import Signup from './components/SignUp/Signup'
 import { Routes, Route } from "react-router-dom"
