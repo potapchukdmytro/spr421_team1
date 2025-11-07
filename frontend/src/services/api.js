@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7041/api
 // Generic API request helper
 const apiRequest = async (endpoint, options = {}) => {
   try {
-    const token = localStorage.getItem('authToken')
+    const token = localStorage.getItem('token') // Changed from 'authToken' to 'token'
     const headers = {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -16,16 +16,62 @@ const apiRequest = async (endpoint, options = {}) => {
       headers,
     })
 
-    const data = await response.json()
-
-    if (!response.ok) {
-      return { success: false, error: data.message || 'Request failed' }
+    // Get response text first
+    const responseText = await response.text()
+    
+    // If response is empty, return error
+    if (!responseText || responseText.trim() === '') {
+      console.error('Empty response from server')
+      return {
+        success: false,
+        isSuccess: false,
+        error: 'Empty response from server',
+        message: 'Empty response from server'
+      }
     }
 
-    return { success: true, data }
+    // Try to parse JSON
+    let data
+    try {
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('JSON Parse Error:', parseError)
+      console.error('Raw response:', responseText)
+      return {
+        success: false,
+        isSuccess: false,
+        error: 'Invalid response from server',
+        message: 'Invalid response from server'
+      }
+    }
+
+    // Backend returns: { isSuccess, message, payload }
+    // Check if response indicates failure
+    if (data.isSuccess === false) {
+      return { 
+        success: false, 
+        isSuccess: false,
+        error: data.message || 'Request failed',
+        message: data.message || 'Request failed'
+      }
+    }
+
+    // Success response
+    return { 
+      success: true, 
+      isSuccess: true,
+      data: data.payload,
+      payload: data.payload,
+      message: data.message
+    }
   } catch (error) {
     console.error('API Error:', error)
-    return { success: false, error: error.message }
+    return { 
+      success: false, 
+      isSuccess: false,
+      error: error.message,
+      message: error.message
+    }
   }
 }
 
@@ -46,21 +92,22 @@ export const authAPI = {
   },
 
   logout: () => {
-    localStorage.removeItem('authToken')
+    localStorage.removeItem('token')
   },
 
   getCurrentUser: () => {
-    const token = localStorage.getItem('authToken')
+    const token = localStorage.getItem('token')
     if (!token) return null
 
     try {
       // Decode JWT token (simple base64 decode, not cryptographically secure but works for reading)
       const payload = JSON.parse(atob(token.split('.')[1]))
+      console.log('Decoded JWT payload:', payload) // Debug log
       return {
-        id: payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'] || payload.sub,
-        userName: payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name'] || payload.name,
-        email: payload['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'] || payload.email,
-        roles: payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'] || []
+        id: payload.id || payload.sub,
+        userName: payload.userName || payload.name,
+        email: payload.email,
+        roles: payload.roles || []
       }
     } catch (error) {
       console.error('Token decode error:', error)
@@ -69,7 +116,7 @@ export const authAPI = {
   },
 
   isAuthenticated: () => {
-    return !!localStorage.getItem('authToken')
+    return !!localStorage.getItem('token')
   }
 }
 

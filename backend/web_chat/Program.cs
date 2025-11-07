@@ -20,10 +20,7 @@ builder.Services.AddControllers();
 // DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    // NOTE TO BACKEND TEAM: Switch back to "axneo_db" for your local testing
-    // Currently using "DefaultDb" for main development
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultDb"));
-    //options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db")); // for backend team testing, uncomment if needed
+    options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db"));
 });
 
 // Identity
@@ -125,13 +122,13 @@ using (var scope = app.Services.CreateScope())
         db.Database.Migrate();
     }
     
+    // Seed roles FIRST (required for user registration)
+    var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+    await seeder.SeedAllAsync();
+    
     // Seed test data (one room with messages)
     var testSeeder = scope.ServiceProvider.GetRequiredService<TestDataSeeder>();
     await testSeeder.SeedAsync();
-    
-    // Seed database
-    // var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
-    // await seeder.SeedAllAsync();
 }
 
 app.Run();
