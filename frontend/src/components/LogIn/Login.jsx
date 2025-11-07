@@ -1,12 +1,22 @@
-import { useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import gsap from 'gsap'
+import confetti from 'canvas-confetti'
+import { authAPI } from '../../services/api'
 import './Login.css'
 
 const Login = () => {
   const formRef = useRef(null)
   const titleRef = useRef(null)
   const fieldsRef = useRef(null)
+  const navigate = useNavigate()
+
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const tl = gsap.timeline()
@@ -52,6 +62,50 @@ const Login = () => {
     }
   }, [])
 
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      console.log('Login data:', formData)
+      const response = await authAPI.login(formData.email, formData.password)
+      console.log('Login response:', response)
+      
+      if (response.isSuccess) {
+        // Save token
+        localStorage.setItem('token', response.payload)
+        
+        // Celebration confetti! 🎉
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ['#37352f', '#FAFAFA', '#e8e6e3', '#d3d1cb']
+        })
+        
+        // Small delay for confetti effect, then redirect
+        setTimeout(() => {
+          navigate('/chat')
+        }, 500)
+      } else {
+        setError(response.message || 'Login failed')
+      }
+    } catch (err) {
+      console.error('Login error:', err)
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    })
+  }
+
   const titleText = 'Log in'
   
   return (
@@ -72,28 +126,42 @@ const Login = () => {
           ))}
         </h1>
         
-        <form className="auth-form" ref={fieldsRef}>
+        {error && (
+          <div className="auth-error">
+            {error}
+          </div>
+        )}
+        
+        <form className="auth-form" ref={fieldsRef} onSubmit={handleSubmit}>
           <div className="form-field">
             <label className="form-label">Email</label>
             <input 
               type="email" 
+              name="email"
               className="form-input" 
               placeholder="name@example.com"
               autoComplete="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
             />
           </div>
           
           <div className="form-field">
             <label className="form-label">Password</label>
             <input 
-              type="password" 
+              type="password"
+              name="password"
               className="form-input"
               autoComplete="current-password"
+              value={formData.password}
+              onChange={handleChange}
+              required
             />
           </div>
           
-          <button type="submit" className="auth-button">
-            Log In
+          <button type="submit" className="auth-button" disabled={loading}>
+            {loading ? 'Logging in...' : 'Log In'}
           </button>
           
           <p className="auth-footer">

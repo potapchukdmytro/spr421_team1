@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Text.Json.Serialization;
 
 namespace web_chat.BLL.Services
 {
@@ -8,6 +9,8 @@ namespace web_chat.BLL.Services
         public bool IsSuccess { get; set; } = true;
         public object? Payload { get; set; } = null;
         public object? Data { get; set; } = null;
+        
+        [JsonIgnore]
         public HttpStatusCode StatusCode { get; set; } = HttpStatusCode.OK;
     }
 }

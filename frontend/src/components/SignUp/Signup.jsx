@@ -1,12 +1,24 @@
-import { useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { gsap } from 'gsap'
+import confetti from 'canvas-confetti'
+import { authAPI } from '../../services/api'
 import './Signup.css'
 
 const Signup = () => {
   const formRef = useRef(null)
   const titleRef = useRef(null)
   const fieldsRef = useRef(null)
+  const navigate = useNavigate()
+
+  const [formData, setFormData] = useState({
+    userName: '',
+    email: '',
+    password: ''
+  })
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const tl = gsap.timeline()
@@ -55,6 +67,59 @@ const Signup = () => {
     }
   }, [])
 
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    setLoading(true)
+
+    try {
+      console.log('Registration data:', formData)
+      const response = await authAPI.register(formData.userName, formData.email, formData.password)
+      console.log('Full registration response:', response)
+      console.log('response.isSuccess:', response.isSuccess)
+      console.log('response.payload:', response.payload)
+      
+      if (response.isSuccess) {
+        console.log('Registration successful!')
+        
+        // Celebration confetti! 🎉
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#37352f', '#FAFAFA', '#e8e6e3', '#d3d1cb']
+        })
+        
+        // Show success message
+        setSuccess('Account created successfully! Redirecting to login...')
+        
+        // Clear form
+        setFormData({ userName: '', email: '', password: '' })
+        
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+          navigate('/login')
+        }, 2000)
+      } else {
+        console.log('Registration failed:', response.message)
+        setError(response.message || 'Registration failed')
+      }
+    } catch (err) {
+      console.error('Registration error:', err)
+      setError('Network error. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    })
+  }
+
   const titleText = 'Sign Up'
 
   return (
@@ -74,35 +139,61 @@ const Signup = () => {
             </span>
           ))}
         </h1>
-        <form className="auth-form" ref={fieldsRef}>
+        
+        {error && (
+          <div className="auth-error">
+            {error}
+          </div>
+        )}
+        
+        {success && (
+          <div className="auth-success">
+            {success}
+          </div>
+        )}
+        
+        <form className="auth-form" ref={fieldsRef} onSubmit={handleSubmit}>
           <div className="form-field">
             <label className="form-label">Name</label>
             <input
               type="text"
+              name="userName"
               className="form-input"
               placeholder="Your name"
               autoComplete="name"
+              value={formData.userName}
+              onChange={handleChange}
+              required
             />
           </div>
           <div className="form-field">
             <label className="form-label">Email</label>
             <input
               type="email"
+              name="email"
               className="form-input"
               placeholder="name@example.com"
               autoComplete="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
             />
           </div>
           <div className="form-field">
             <label className="form-label">Password</label>
             <input
               type="password"
+              name="password"
               className="form-input"
               autoComplete="new-password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              minLength={6}
             />
           </div>
-          <button type="submit" className="auth-button">
-            Sign Up
+          <button type="submit" className="auth-button" disabled={loading}>
+            {loading ? 'Signing up...' : 'Sign Up'}
           </button>
           <p className="auth-footer">
             Already have an account?{' '}

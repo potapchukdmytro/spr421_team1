@@ -20,8 +20,7 @@ builder.Services.AddControllers();
 // DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    //options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultDb"));
-    options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db")); // for my testing, comment if on your machine
+    options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db"));
 });
 
 // Identity
@@ -75,7 +74,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("dev", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173")
+        policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "http://localhost:5174")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -116,14 +115,20 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    
+    // Apply migrations (this will create proper Identity schema)
     if (db.Database.GetPendingMigrations().Any())
     {
         db.Database.Migrate();
     }
     
-    // Seed database
+    // Seed roles FIRST (required for user registration)
     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
     await seeder.SeedAllAsync();
+    
+    // Seed test data (one room with messages)
+    var testSeeder = scope.ServiceProvider.GetRequiredService<TestDataSeeder>();
+    await testSeeder.SeedAsync();
 }
 
 app.Run();
