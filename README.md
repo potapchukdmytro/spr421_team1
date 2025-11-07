@@ -1,4 +1,4 @@
-"# Web Chat Application
+# Web Chat Application
 
 ## Built With
 
@@ -10,4 +10,3 @@
 ![ASP.NET Core](https://img.shields.io/badge/ASP.NET%20Core-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)
 
 </div>
-" 
