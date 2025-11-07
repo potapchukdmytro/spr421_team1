@@ -20,8 +20,10 @@ builder.Services.AddControllers();
 // DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    //options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultDb"));
-    options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db")); // for my testing, comment if on your machine
+    // NOTE TO BACKEND TEAM: Switch back to "axneo_db" for your local testing
+    // Currently using "DefaultDb" for main development
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultDb"));
+    //options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db")); // for backend team testing, uncomment if needed
 });
 
 // Identity
@@ -75,7 +77,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("dev", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173")
+        policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "http://localhost:5174")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -116,14 +118,20 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    
+    // Apply migrations (this will create proper Identity schema)
     if (db.Database.GetPendingMigrations().Any())
     {
         db.Database.Migrate();
     }
     
+    // Seed test data (one room with messages)
+    var testSeeder = scope.ServiceProvider.GetRequiredService<TestDataSeeder>();
+    await testSeeder.SeedAsync();
+    
     // Seed database
-    var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
-    await seeder.SeedAllAsync();
+    // var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+    // await seeder.SeedAllAsync();
 }
 
 app.Run();

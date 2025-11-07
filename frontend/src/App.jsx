@@ -1,10 +1,11 @@
 import './App.css'
-import Welcome from './components/Welcome/Welcome'
+import MainAppUI from './components/MainAppUI/MainAppUI'
+// import Welcome from './components/Welcome/Welcome'
 
-const App = () => {
+function App() {
   return (
-    <div className="app">
-      <Welcome />
+    <div className="app-container">
+      <MainAppUI />
     </div>
   )
 }
