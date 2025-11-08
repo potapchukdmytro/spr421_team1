@@ -43,7 +43,7 @@ const MainAppUI = () => {
       const formattedRooms = result.data.map(room => ({
         id: room.id,
         name: room.name,
-        avatar: room.name.substring(0, 2).toUpperCase(),
+        avatar: room.name.substring(0, 2).toUpperCase(), // pfp
         lastMessage: 'Click to load messages',
         time: formatTime(room.createdAt),
         unread: 0,
@@ -63,7 +63,7 @@ const MainAppUI = () => {
   }, [])
 
   // Load messages for selected room
-  const loadMessages = useCallback(async (roomId) => {
+  const loadMessages = useCallback(async (roomId) => { // optimized, function will not recreate on each render
     setLoadingMessages(true)
     const result = await messagesAPI.getByRoom(roomId)
     
@@ -80,9 +80,9 @@ const MainAppUI = () => {
     } else {
       // Fallback to mock messages
       setMessages([
-        { id: 1, sender: 'Dmytro Potapchuk', avatar: 'DP', text: 'Hey! How are you?', time: '10:25', isMine: false },
+        { id: 1, sender: 'Some User', avatar: 'DP', text: 'Hey! How are you?', time: '10:25', isMine: false },
         { id: 2, sender: 'Me', text: 'Great! Just working on the chat UI', time: '10:26', isMine: true },
-        { id: 3, sender: 'Dmytro Potapchuk', avatar: 'DP', text: 'Awesome! Can\'t wait to see it', time: '10:28', isMine: false },
+        { id: 3, sender: 'Some User', avatar: 'DP', text: 'Awesome! Can\'t wait to see it', time: '10:28', isMine: false },
         { id: 4, sender: 'Me', text: 'It\'s looking really good! Check it out soon 🚀', time: '10:30', isMine: true },
       ])
     }
