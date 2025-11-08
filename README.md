@@ -1,6 +1,9 @@
 # Web Chat Application
+<<<<<<< HEAD
 
 ![Screenshot](screenshot.png)
+=======
+>>>>>>> c82b1d9f257a56aaab4fdd12bb2bd21a49f1e2c0
 
 ## Built With
 
@@ -13,6 +16,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
 
 </div>
+<<<<<<< HEAD
 
 ## 🚀 Quick Start
 
@@ -94,3 +98,5 @@ VITE_API_URL=http://localhost:5000/api
 
 Made by [Kyuuto09](https://github.com/Kyuuto09), [axneo27](https://github.com/axneo27), [SlavaMokrynskyi](https://github.com/SlavaMokrynskyi), [da2045](https://github.com/da2045) & [samoliukrustam123](https://github.com/samoliukrustam123)
 
+=======
+>>>>>>> c82b1d9f257a56aaab4fdd12bb2bd21a49f1e2c0
