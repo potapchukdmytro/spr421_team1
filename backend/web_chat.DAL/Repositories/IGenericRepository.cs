@@ -7,9 +7,8 @@ namespace web_chat.DAL.Repositories
     {
         Task CreateAsync(TEntity entity);
         Task UpdateAsync(TEntity entity);
-        Task DeleteAsync(string id);
+        Task DeleteAsync(TEntity entity);
         Task<TEntity?> GetByIdAsync(string id);
         IQueryable<TEntity> GetAll();
-
     }
 }

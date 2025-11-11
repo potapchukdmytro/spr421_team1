@@ -11,17 +11,19 @@ using web_chat.DAL.Seeders;
 using web_chat.BLL.Services.Auth;
 using web_chat.BLL.Settings;
 using System.Text;
+using web_chat.Hubs;
+using web_chat.DAL.Repositories.RoomRepository;
+using web_chat.DAL.Repositories.UserRoomRepository;
+using web_chat.BLL.Services.RoomService;
+using web_chat.BLL.Services.UserRoomService;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 
-// DbContext
-builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db"));
-});
+// Add SignalR
+builder.Services.AddSignalR();
 
 // Identity
 builder.Services
@@ -61,10 +63,33 @@ builder.Services
             IssuerSigningKey = key,
             ClockSkew = TimeSpan.Zero
         };
+
+        // For SignalR
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    path.StartsWithSegments("/chat"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
+// Repositories
+builder.Services.AddScoped<IUserRoomRepository, UserRoomRepository>();
+builder.Services.AddScoped<IRoomRepository, RoomRepository>();
 
 // Custom services
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IRoomService, RoomService>();
+builder.Services.AddScoped<IUserRoomService, UserRoomService>();
 
 // Add database seeders
 builder.Services.AddDatabaseSeeders();
@@ -87,7 +112,7 @@ builder.Services.AddCors(options =>
 // DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultDb"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("mokrui_db")); // DefaultDb - захощена база, змінюйте на свою локальну при тестуванні
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -110,6 +135,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.MapHub<ChatHub>("/chat");
 
 // Apply pending migrations and seed database
 using (var scope = app.Services.CreateScope())

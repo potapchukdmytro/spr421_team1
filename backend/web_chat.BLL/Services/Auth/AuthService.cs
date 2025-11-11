@@ -116,7 +116,9 @@ namespace web_chat.BLL.Services.Auth
             {
                 new Claim("id", user.Id!),
                 new Claim("userName", user.UserName!),
-                new Claim("email", user.Email!)
+                new Claim("email", user.Email!),
+
+                new Claim(ClaimTypes.Name, user.UserName!), // For ChatHub
             };
 
             var userRoles = await _userManager.GetRolesAsync(user);
