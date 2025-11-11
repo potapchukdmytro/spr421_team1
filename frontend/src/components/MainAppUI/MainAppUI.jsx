@@ -4,6 +4,7 @@ import './MainAppUI.css'
 
 const MainAppUI = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false)
   const [selectedRoom, setSelectedRoom] = useState(null)
   const [rooms, setRooms] = useState([])
   const [messages, setMessages] = useState([])
@@ -221,14 +222,14 @@ const MainAppUI = () => {
 
           {isProfileOpen && (
             <div className="profile-dropdown">
-              <button className="dropdown-item">
+              <button className="dropdown-item" onClick={() => setIsSettingsModalOpen(true)}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M3 13C3 10.2386 5.23858 8 8 8C10.7614 8 13 10.2386 13 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
                 Profile
               </button>
-              <button className="dropdown-item">
+              <button className="dropdown-item" onClick={() => setIsSettingsModalOpen(true)}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M8 5V8L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -352,6 +353,45 @@ const MainAppUI = () => {
           </div>
         )}
       </div>
+
+      {/* Settings Modal */}
+      {isSettingsModalOpen && (
+        <div className="settings-overlay" onClick={(e) => e.target === e.currentTarget && setIsSettingsModalOpen(false)}>
+          <div className="settings-modal">
+            <div className="settings-header">
+              <button className="settings-back-btn" onClick={() => setIsSettingsModalOpen(false)}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M12.5 15L7.5 10L12.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              <h2 className="settings-title">Settings</h2>
+            </div>
+            
+            <div className="settings-content">
+              <div className="settings-section">
+                <h3 className="settings-section-title">Profile</h3>
+                <div className="settings-row">
+                  <span>Username</span>
+                  <span>{currentUser?.name || 'Loading...'}</span>
+                </div>
+                <div className="settings-row">
+                  <span>Email</span>
+                  <span>{currentUser?.email || 'Loading...'}</span>
+                </div>
+              </div>
+
+              <div className="settings-divider"></div>
+
+              <div className="settings-section">
+                <h3 className="settings-section-title">Account</h3>
+                <button className="settings-logout-btn" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
