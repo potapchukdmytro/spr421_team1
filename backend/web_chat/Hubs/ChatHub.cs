@@ -2,8 +2,10 @@
 using Microsoft.AspNetCore.SignalR;
 using web_chat.BLL.Dtos.UserRoom;
 using web_chat.BLL.Dtos.Room;
+using web_chat.BLL.Dtos.Message;
 using web_chat.BLL.Services.RoomService;
 using web_chat.BLL.Services.UserRoomService;
+using web_chat.BLL.Services.MessageService;
 
 namespace web_chat.Hubs
 {
@@ -12,10 +14,13 @@ namespace web_chat.Hubs
     {
         private readonly IUserRoomService _userRoomService;
         private readonly IRoomService _roomService;
-        public ChatHub(IUserRoomService userRoomService, IRoomService roomService)
+        private readonly IMessageService _messageService;
+        
+        public ChatHub(IUserRoomService userRoomService, IRoomService roomService, IMessageService messageService)
         {
             _userRoomService = userRoomService;
             _roomService = roomService;
+            _messageService = messageService;
         }
 
         public override async Task OnConnectedAsync()
@@ -37,18 +42,113 @@ namespace web_chat.Hubs
 
         public async Task Send(string message, string roomId)
         {
+            var userId = GetUserId();
             var userName = Context.User?.Identity?.Name;
 
-            await Clients.Group(roomId).SendAsync("ReceiveMessage", new {userName, message});
+            // Базова валідація
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                await Clients.Caller.SendAsync("MessageError", new { roomId, error = "Message cannot be empty." });
+                return;
+            }
+            if (message.Length > 1000)
+            {
+                await Clients.Caller.SendAsync("MessageError", new { roomId, error = "Message is too long (max 1000 characters)." });
+                return;
+            }
 
-            //todo : зберігати повідомлення в БД
+            // Перевірка членства користувача в кімнаті
+            var membershipId = await _userRoomService.GetIdByUserIdRoomIdAsync(userId, roomId);
+            if (membershipId is null)
+            {
+                await Clients.Caller.SendAsync("MessageError", new { roomId, error = "You are not a member of this room." });
+                return;
+            }
+
+            // Збереження повідомлення в БД
+            var createMessageDto = new CreateMessageDto
+            {
+                Text = message,
+                UserId = userId,
+                RoomId = roomId
+            };
+
+            var saveResult = await _messageService.CreateMessageAsync(createMessageDto);
+
+            if (saveResult.IsSuccess)
+            {
+                var savedMessage = saveResult.Data as MessageDto;
+
+                // Надсилаємо повідомлення з додатковою інформацією всім клієнтам у кімнаті
+                await Clients.Group(roomId).SendAsync("ReceiveMessage", new
+                {
+                    id = savedMessage?.Id,
+                    userName = userName,
+                    message = message,
+                    sentAt = savedMessage?.SentAt,
+                    userId = userId
+                });
+            }
+            else
+            {
+                // Якщо збереження не вдалося, надсилаємо помилку лише відправнику
+                await Clients.Caller.SendAsync("MessageError", new { roomId, error = saveResult.Message });
+            }
         }
         public async Task SendToSome(string message, List<string> roomIds)
         {
+            var userId = GetUserId();
+            var userName = Context.User?.Identity?.Name;
+
+            // Базова валідація
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                await Clients.Caller.SendAsync("MessageError", new { error = "Message cannot be empty." });
+                return;
+            }
+            if (message.Length > 1000)
+            {
+                await Clients.Caller.SendAsync("MessageError", new { error = "Message is too long (max 1000 characters)." });
+                return;
+            }
+
             foreach (var roomId in roomIds)
             {
-                var userName = Context.User?.Identity?.Name;
-                await Clients.Group(roomId).SendAsync("ReceiveMessage", new { userName, message });
+                // Перевірка членства користувача в кімнаті
+                var membershipId = await _userRoomService.GetIdByUserIdRoomIdAsync(userId, roomId);
+                if (membershipId is null)
+                {
+                    await Clients.Caller.SendAsync("MessageError", new { roomId, error = "You are not a member of this room." });
+                    continue;
+                }
+
+                // Збереження повідомлення в БД для кожної кімнати
+                var createMessageDto = new CreateMessageDto
+                {
+                    Text = message,
+                    UserId = userId,
+                    RoomId = roomId
+                };
+
+                var saveResult = await _messageService.CreateMessageAsync(createMessageDto);
+
+                if (saveResult.IsSuccess)
+                {
+                    var savedMessage = saveResult.Data as MessageDto;
+
+                    await Clients.Group(roomId).SendAsync("ReceiveMessage", new
+                    {
+                        id = savedMessage?.Id,
+                        userName = userName,
+                        message = message,
+                        sentAt = savedMessage?.SentAt,
+                        userId = userId
+                    });
+                }
+                else
+                {
+                    await Clients.Caller.SendAsync("MessageError", new { roomId, error = saveResult.Message });
+                }
             }
         }
         public async Task CreateRoom(string roomName, bool isPrivate, List<string> userIds)
@@ -116,6 +216,22 @@ namespace web_chat.Hubs
 
             await Clients.Group(roomId).SendAsync("RoomDeleted", roomId);
         }
+
+        public async Task GetRoomMessages(string roomId)
+        {
+            var userId = GetUserId();
+            var response = await _messageService.GetRoomMessagesAsync(roomId, userId);
+            
+            if (response.IsSuccess)
+            {
+                await Clients.Caller.SendAsync("RoomMessages", new { roomId, messages = response.Data });
+            }
+            else
+            {
+                await Clients.Caller.SendAsync("MessageError", new { error = response.Message });
+            }
+        }
+
         private string GetUserId()
         {
             var userId = Context.User?.FindFirst("id")?.Value;

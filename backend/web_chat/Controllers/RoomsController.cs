@@ -23,7 +23,7 @@ namespace web_chat.Controllers
         }
 
         [HttpGet("messages")]
-        public async Task<IActionResult> GetRoomMessages([FromQuery] string roomId, [FromQuery] string userId) // userId - для перевірки чи є повідомлення користувача
+        public async Task<IActionResult> GetRoomMessages([FromQuery] string roomId, [FromQuery] string userId)
         {
             var response = await _roomService.GetRoomMessagesAsync(roomId,userId);
             return Ok(response);

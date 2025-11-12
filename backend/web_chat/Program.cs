@@ -14,18 +14,20 @@ using System.Text;
 using web_chat.Hubs;
 using web_chat.DAL.Repositories.RoomRepository;
 using web_chat.DAL.Repositories.UserRoomRepository;
+using web_chat.DAL.Repositories.MessageRepository;
 using web_chat.BLL.Services.RoomService;
 using web_chat.BLL.Services.UserRoomService;
+using web_chat.BLL.Services.MessageService;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Додати служби до контейнера
 builder.Services.AddControllers();
 
-// Add SignalR
+// Додати SignalR
 builder.Services.AddSignalR();
 
-// Identity
+// Ідентифікація (Identity)
 builder.Services
     .AddIdentity<UserEntity, ApplicationRole>(options =>
     {
@@ -38,10 +40,10 @@ builder.Services
     .AddEntityFrameworkStores<AppDbContext>()
     .AddDefaultTokenProviders();
 
-// Settings
+// Налаштування
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 
-// JWT Auth
+// JWT-автентифікація
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SecretKey ?? string.Empty));
 
@@ -64,7 +66,7 @@ builder.Services
             ClockSkew = TimeSpan.Zero
         };
 
-        // For SignalR
+    // Для SignalR
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
@@ -82,16 +84,17 @@ builder.Services
             }
         };
     });
-// Repositories
+// Репозиторії
 builder.Services.AddScoped<IUserRoomRepository, UserRoomRepository>();
 builder.Services.AddScoped<IRoomRepository, RoomRepository>();
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 
-// Custom services
+// Користувацькі служби
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoomService, RoomService>();
 builder.Services.AddScoped<IUserRoomService, UserRoomService>();
+builder.Services.AddScoped<IMessageService, MessageService>();
 
-// Add database seeders
 builder.Services.AddDatabaseSeeders();
 
 // CORS
@@ -106,13 +109,11 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 
-
-// DbContext
+// Налаштування DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("mokrui_db")); // DefaultDb - �������� ����, ������� �� ���� �������� ��� ����������
+    options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db")); // Рядок підключення до бази даних
 });
 
 builder.Services.AddEndpointsApiExplorer();
@@ -120,7 +121,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Налаштування конвеєра HTTP-запитів
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -138,22 +139,22 @@ app.MapControllers();
 
 app.MapHub<ChatHub>("/chat");
 
-// Apply pending migrations and seed database
+// Застосувати міграції та засіяти (seed) базу даних
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     
-    // Apply migrations (this will create proper Identity schema)
+    // Застосувати міграції (створить коректну схему Identity)
     if (db.Database.GetPendingMigrations().Any())
     {
         db.Database.Migrate();
     }
     
-    // Seed roles FIRST (required for user registration)
+    // Спочатку ініціалізувати ролі (потрібно для реєстрації користувачів)
     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
     await seeder.SeedAllAsync();
     
-    // Seed test data (one room with messages)
+    // Засіяти тестові дані (приклад кімнати та повідомлень)
     var testSeeder = scope.ServiceProvider.GetRequiredService<TestDataSeeder>();
     await testSeeder.SeedAsync();
 }
