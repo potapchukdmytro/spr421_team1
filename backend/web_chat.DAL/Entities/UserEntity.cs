@@ -8,11 +8,11 @@ namespace web_chat.DAL.Entities
     {
         public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
 
-        // Navigation properties for chat functionality
+    // Навігаційні властивості для функціоналу чату
         public virtual ICollection<MessageEntity> Messages { get; set; } = [];
         public virtual ICollection<UserRoomEntity> UserRooms { get; set; } = [];
         
-        // Identity navigation properties
+    // Навігаційні властивості Identity
         public virtual ICollection<ApplicationUserClaim> Claims { get; set; } = [];
         public virtual ICollection<ApplicationUserLogin> Logins { get; set; } = [];
         public virtual ICollection<ApplicationUserToken> Tokens { get; set; } = [];

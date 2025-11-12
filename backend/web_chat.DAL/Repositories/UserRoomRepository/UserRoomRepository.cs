@@ -16,7 +16,7 @@ namespace web_chat.DAL.Repositories.UserRoomRepository
         {
             return await UserRooms
                 .Where(ur => ur.UserId == userId && ur.RoomId == RoomId)
-                .Select(ur => ur.RoomId)
+                .Select(ur => ur.Id)
                 .FirstOrDefaultAsync();
         }
         public async Task<List<string>> GetUserRoomsAsync(string userId)

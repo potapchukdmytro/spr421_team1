@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using web_chat.BLL.Dtos.Message;
 using web_chat.BLL.Dtos.Room;
+using web_chat.BLL.Services.MessageService;
 using web_chat.DAL.Entities;
 using web_chat.DAL.Repositories.RoomRepository;
 
@@ -9,9 +10,12 @@ namespace web_chat.BLL.Services.RoomService
     public class RoomService : IRoomService
     {
         private readonly IRoomRepository _roomRepository;
-        public RoomService(IRoomRepository roomRepository)
+        private readonly IMessageService _messageService;
+        
+        public RoomService(IRoomRepository roomRepository, IMessageService messageService)
         {
             _roomRepository = roomRepository;
+            _messageService = messageService;
         }
         public async Task<ServiceResponse> CreateRoomAsync(CreateRoomDto dto)
         {
@@ -98,23 +102,9 @@ namespace web_chat.BLL.Services.RoomService
                 Data = roomDtos
             };
         }
-        public async Task<ServiceResponse> GetRoomMessagesAsync(string roomId,string userId)
+        public async Task<ServiceResponse> GetRoomMessagesAsync(string roomId, string userId)
         {
-            var messages = await _roomRepository.GetRoomMessagesAsync(roomId);
-            var payload = messages.Select(m => new MessageDto
-            {
-                Id = m.Id,
-                Text = m.Text,
-                SentAt = m.SentAt,
-                UserId = m.UserId!,
-                UserName = m.User?.UserName!,
-                IsMine = m.UserId == userId
-            }).ToList();
-            return new ServiceResponse
-            {
-                Message = "Messages successfully retrieved.",
-                Data = payload
-            };
+            return await _messageService.GetRoomMessagesAsync(roomId, userId);
         }
 
         public async Task<ServiceResponse> GetRoomByIdAsync(string roomId)

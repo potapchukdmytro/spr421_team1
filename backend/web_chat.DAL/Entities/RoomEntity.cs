@@ -10,7 +10,7 @@ namespace web_chat.DAL.Entities
 
         public bool IsPrivate { get; set; } = false;
 
-        // Navigation properties
+    // Навігаційні властивості
         public virtual ICollection<MessageEntity> Messages { get; set; } = [];
         public virtual ICollection<UserRoomEntity> UserRooms { get; set; } = [];
     }

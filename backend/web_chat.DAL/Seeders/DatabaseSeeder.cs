@@ -17,7 +17,7 @@ namespace web_chat.DAL.Seeders
 
             try
             {
-                // Seed roles
+                // Ініціалізація ролей
                 using var scope = _serviceProvider.CreateScope();
                 var roleSeeder = scope.ServiceProvider.GetRequiredService<RoleSeeder>();
                 await roleSeeder.SeedAsync();

@@ -9,11 +9,11 @@ namespace web_chat.DAL.Entities
 
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
 
-        // Foreign keys
+    // Зовнішні ключі
         public string? UserId { get; set; }
         public string? RoomId { get; set; }
 
-        // Navigation properties
+    // Навігаційні властивості
         public virtual UserEntity? User { get; set; }
         public virtual RoomEntity? Room { get; set; }
     }

@@ -14,7 +14,7 @@ namespace web_chat.DAL.Entities
         public bool IsAdmin { get; set; } = false;
         public bool IsBanned { get; set; } = false;
 
-        // Navigation properties
+    // Навігаційні властивості
         public virtual UserEntity User { get; set; } = null!;
         public virtual RoomEntity Room { get; set; } = null!;
     }

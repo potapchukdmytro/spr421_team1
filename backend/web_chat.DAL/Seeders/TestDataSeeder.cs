@@ -14,13 +14,13 @@ namespace web_chat.DAL.Seeders
 
         public async Task SeedAsync()
         {
-            // Only seed if no rooms exist
+            // Виконувати сидінг лише якщо кімнат ще немає
             if (_context.Rooms.Any())
             {
                 return;
             }
 
-            // Create a test user
+            // Створити тестового користувача
             var testUser = new UserEntity
             {
                 Id = Guid.NewGuid().ToString(),
@@ -30,7 +30,7 @@ namespace web_chat.DAL.Seeders
             };
             _context.Users.Add(testUser);
 
-            // Create a test room
+            // Створити тестову кімнату
             var testRoom = new RoomEntity
             {
                 Id = Guid.NewGuid().ToString(),
@@ -40,7 +40,7 @@ namespace web_chat.DAL.Seeders
             };
             _context.Rooms.Add(testRoom);
 
-            // Create test messages
+            // Створити тестові повідомлення
             var messages = new[]
             {
                 new MessageEntity
@@ -83,7 +83,7 @@ namespace web_chat.DAL.Seeders
 
             _context.Messages.AddRange(messages);
 
-            // Create UserRoom relationship
+            // Створити зв'язок UserRoom (членство користувача у кімнаті)
             var userRoom = new UserRoomEntity
             {
                 Id = Guid.NewGuid().ToString(),

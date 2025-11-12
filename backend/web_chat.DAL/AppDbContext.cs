@@ -11,7 +11,7 @@ namespace web_chat.DAL
         {
         }
 
-        // DbSets for chat entities
+    // Набори сутностей (DbSet) для чату
         public DbSet<RoomEntity> Rooms { get; set; } = null!;
         public DbSet<MessageEntity> Messages { get; set; } = null!;
         public DbSet<UserRoomEntity> UserRooms { get; set; } = null!;
@@ -20,11 +20,11 @@ namespace web_chat.DAL
         {
             base.OnModelCreating(modelBuilder);
 
-            // Rename Identity tables to simpler names
+            // Перейменування таблиць Identity на простіші назви
             modelBuilder.Entity<UserEntity>().ToTable("Users");
             modelBuilder.Entity<ApplicationRole>().ToTable("Roles");
 
-            // Configure Identity relationships to avoid shadow properties
+            // Налаштування зв'язків Identity, щоб уникнути "тіньових" властивостей
             ConfigureIdentityRelationships(modelBuilder);
             
             ConfigureRoomEntity(modelBuilder);
@@ -34,7 +34,7 @@ namespace web_chat.DAL
 
         private void ConfigureIdentityRelationships(ModelBuilder modelBuilder)
         {
-            // Configure ApplicationUserRole
+            // Налаштування ApplicationUserRole
             modelBuilder.Entity<ApplicationUserRole>(entity =>
             {
                 entity.HasOne(ur => ur.User)
@@ -46,7 +46,7 @@ namespace web_chat.DAL
                     .HasForeignKey(ur => ur.RoleId);
             });
 
-            // Configure ApplicationRoleClaim
+            // Налаштування ApplicationRoleClaim
             modelBuilder.Entity<ApplicationRoleClaim>(entity =>
             {
                 entity.HasOne(rc => rc.Role)
@@ -54,7 +54,7 @@ namespace web_chat.DAL
                     .HasForeignKey(rc => rc.RoleId);
             });
 
-            // Configure ApplicationUserClaim
+            // Налаштування ApplicationUserClaim
             modelBuilder.Entity<ApplicationUserClaim>(entity =>
             {
                 entity.HasOne(uc => uc.User)
@@ -62,7 +62,7 @@ namespace web_chat.DAL
                     .HasForeignKey(uc => uc.UserId);
             });
 
-            // Configure ApplicationUserLogin
+            // Налаштування ApplicationUserLogin
             modelBuilder.Entity<ApplicationUserLogin>(entity =>
             {
                 entity.HasOne(ul => ul.User)
@@ -70,7 +70,7 @@ namespace web_chat.DAL
                     .HasForeignKey(ul => ul.UserId);
             });
 
-            // Configure ApplicationUserToken
+            // Налаштування ApplicationUserToken
             modelBuilder.Entity<ApplicationUserToken>(entity =>
             {
                 entity.HasOne(ut => ut.User)
