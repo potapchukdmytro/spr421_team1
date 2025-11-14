@@ -105,7 +105,7 @@ builder.Services.AddCors(options =>
 // DbContext - THIS IS THE CORRECT, SINGLE ENTRY
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("hosted_db3"));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("hosted_db"));
 });
 
 builder.Services.AddEndpointsApiExplorer();
