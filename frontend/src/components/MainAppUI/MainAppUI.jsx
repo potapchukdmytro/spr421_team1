@@ -119,23 +119,36 @@ const MainAppUI = () => {
           if (!selectedRoomRef.current || data.roomId !== selectedRoomRef.current.id) {
             return
           }
-          
-          // Check if we've already seen this message
-          const messageSignature = `${data.userName.toLowerCase().trim()}:${data.message.trim()}`
+
+          // Generate a unique signature for this message to prevent duplicates
+          const messageSignature = `${data.userName || 'Unknown'}:${data.message}:${data.roomId}`
+
+          // Check if we've already processed this message
           if (messageSignaturesRef.current.has(messageSignature)) {
+            console.log('🔄 Duplicate message received, ignoring:', messageSignature)
             return
           }
-          
-          // Add message to UI
+
+          // Don't add messages from current user - they're already shown via optimistic UI
+          if (data.userName === currentUserRef.current?.name) {
+            console.log('📨 Ignoring own message (already shown optimistically):', data.userName)
+            messageSignaturesRef.current.add(messageSignature) // Mark as processed to prevent future duplicates
+            return
+          }
+
+          // Mark this message as processed
           messageSignaturesRef.current.add(messageSignature)
+
+          console.log('📨 New message received via SignalR from other user:', data)
+
           setMessages(prev => {
             const message = {
-              id: `msg-${Date.now()}-${Math.random()}`,
+              id: `signalr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               sender: data.userName || 'Unknown',
               avatar: (data.userName || 'U').substring(0, 2).toUpperCase(),
               text: data.message,
               time: formatTime(new Date()),
-              isMine: false
+              isMine: false // Messages from SignalR listener are always from other users
             }
             return [...prev, message]
           })
@@ -251,41 +264,56 @@ const MainAppUI = () => {
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedRoom) return
 
-    const messageText = newMessage
+    const messageText = newMessage.trim()
     setNewMessage('') // Clear input immediately
 
+    // Generate unique message ID to prevent duplicates
+    const messageId = `optimistic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
     // Add message optimistically to UI immediately
-    const messageSignature = `${(currentUser?.name || 'Me').toLowerCase().trim()}:${messageText.trim()}`
     const optimisticMessage = {
-      id: `temp-${Date.now()}-${Math.random()}`,
+      id: messageId,
       text: messageText,
       time: formatTime(new Date()),
       isMine: true,
       sender: currentUser?.name || 'Me',
       avatar: (currentUser?.name || 'ME').substring(0, 2).toUpperCase()
     }
-    
-    // Only add if we haven't seen this message before
-    if (!messageSignaturesRef.current.has(messageSignature)) {
-      messageSignaturesRef.current.add(messageSignature)
-      setMessages(prev => [...prev, optimisticMessage])
-    }
 
-    // Send via SignalR
-    const sentViaSignalR = await signalRService.sendMessage(messageText, selectedRoom.id)
+    // Add to UI immediately (don't check signatures for optimistic messages)
+    setMessages(prev => [...prev, optimisticMessage])
 
-    if (!sentViaSignalR) {
-      // Fallback to REST API
-      console.log('⚠️ SignalR failed, using REST API fallback')
-      
-      const result = await messagesAPI.send(selectedRoom.id, messageText)
-      if (result.success) {
-        loadMessages(selectedRoom.id) // Reload to get real message
+    try {
+      // Send via SignalR first
+      console.log('📤 Attempting to send via SignalR:', messageText)
+      const sentViaSignalR = await signalRService.sendMessage(messageText, selectedRoom.id)
+
+      if (sentViaSignalR) {
+        console.log('✅ Message sent successfully via SignalR')
+        // Message will be received via SignalR and deduplicated
       } else {
-        // Remove optimistic message if failed
-        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
-        alert('Failed to send message')
+        // Fallback to REST API
+        console.log('⚠️ SignalR failed, using REST API fallback')
+        const result = await messagesAPI.send(selectedRoom.id, messageText)
+
+        if (result.success) {
+          console.log('✅ Message sent successfully via REST API')
+          // Reload messages to get the real message from server
+          await loadMessages(selectedRoom.id)
+          // Remove the optimistic message since we'll get the real one
+          setMessages(prev => prev.filter(m => m.id !== messageId))
+        } else {
+          console.error('❌ REST API also failed:', result.error)
+          // Remove optimistic message if both methods failed
+          setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+          alert('Failed to send message. Please try again.')
+        }
       }
+    } catch (error) {
+      console.error('❌ Unexpected error sending message:', error)
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+      alert('Failed to send message. Please check your connection.')
     }
   }
 

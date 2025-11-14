@@ -7,6 +7,7 @@ const SIGNALR_BASE_URL = API_BASE_URL.replace('/api', '');
 class SignalRService {
   constructor() {
     this.connection = null;
+    this.monitorInterval = null;
   }
 
   async connect() {
@@ -61,6 +62,29 @@ class SignalRService {
     }
   }
 
+  startConnectionMonitoring() {
+    // Clear any existing interval
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval);
+    }
+
+    this.monitorInterval = setInterval(() => {
+      if (this.connection) {
+        const state = this.connection.state;
+        if (state !== signalR.HubConnectionState.Connected) {
+          console.warn('⚠️ SignalR connection state:', state);
+        }
+      }
+    }, 5000); // Check every 5 seconds
+  }
+
+  stopConnectionMonitoring() {
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval);
+      this.monitorInterval = null;
+    }
+  }
+
   async disconnect() {
     this.stopConnectionMonitoring();
     if (this.connection) {
@@ -76,16 +100,18 @@ class SignalRService {
   // Send message to a room
   async sendMessage(message, roomId) {
     if (!this.isConnected()) {
-      console.error('❌ SignalR not connected');
+      console.error('❌ SignalR not connected - current state:', this.connection?.state);
       return false;
     }
 
     try {
+      console.log('📤 Sending message via SignalR:', { message: message.substring(0, 50) + (message.length > 50 ? '...' : ''), roomId });
       await this.connection.invoke('Send', message, roomId);
-      console.log('📤 Message sent via SignalR:', { message, roomId });
+      console.log('✅ Message sent successfully via SignalR');
       return true;
     } catch (error) {
-      console.error('❌ Send message error:', error);
+      console.error('❌ SignalR send failed:', error);
+      console.error('❌ Connection state during send:', this.connection?.state);
       return false;
     }
   }
