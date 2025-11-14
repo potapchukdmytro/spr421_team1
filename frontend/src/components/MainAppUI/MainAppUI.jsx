@@ -296,6 +296,41 @@ const MainAppUI = () => {
     }
   }, [selectedRoom, loadMessages])
 
+  // Poll for new messages as fallback for SignalR
+  useEffect(() => {
+    if (!selectedRoom) return
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const result = await messagesAPI.getByRoom(selectedRoom.id)
+        if (result.success && result.data && result.data.length > 0) {
+          const currentMessageIds = new Set(messages.map(m => m.id))
+          
+          // Find messages that we don't have yet
+          const newMessages = result.data.filter(msg => !currentMessageIds.has(msg.id))
+          
+          if (newMessages.length > 0) {
+            console.log('📊 Polling found', newMessages.length, 'new messages')
+            // Format and append the new messages
+            const formattedMessages = newMessages.map(msg => ({
+              id: msg.id,
+              text: msg.text,
+              time: formatTime(msg.sentAt),
+              isMine: msg.userId === currentUser?.id,
+              sender: msg.user?.userName || 'User',
+              avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+            }))
+            setMessages(prev => [...prev, ...formattedMessages])
+          }
+        }
+      } catch (error) {
+        console.error('❌ Polling error:', error)
+      }
+    }, 2000) // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval)
+  }, [selectedRoom, messages, loadMessages])
+
   // Auto scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })

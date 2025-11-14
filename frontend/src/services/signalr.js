@@ -24,28 +24,36 @@ class SignalRService {
 
       this.connection = new signalR.HubConnectionBuilder()
         .withUrl(`${SIGNALR_BASE_URL}/hubs/chat?access_token=${token}`, {
-          transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling
+          transport: signalR.HttpTransportType.WebSockets
         })
         .withAutomaticReconnect()
         .configureLogging(signalR.LogLevel.Information)
         .build();
 
       // Add connection event handlers
-      this.connection.onclose(() => {
-        console.log('🔌 SignalR connection closed');
+      this.connection.onclose((error) => {
+        console.log('🔌 SignalR connection closed', error);
+        console.log('🔌 Connection state:', this.connection?.state);
       });
 
-      this.connection.onreconnecting(() => {
-        console.log('🔄 SignalR reconnecting...');
+      this.connection.onreconnecting((error) => {
+        console.log('🔄 SignalR reconnecting...', error);
+        console.log('🔄 Connection state:', this.connection?.state);
       });
 
-      this.connection.onreconnected(() => {
-        console.log('✅ SignalR reconnected!');
+      this.connection.onreconnected((connectionId) => {
+        console.log('✅ SignalR reconnected!', connectionId);
+        console.log('✅ Connection state:', this.connection?.state);
       });
 
       await this.connection.start();
       console.log('✅ SignalR Connected!', this.connection.connectionId);
       console.log('✅ Connection state:', this.connection.state);
+      console.log('✅ Transport:', this.connection.transport?.name || 'Unknown');
+
+      // Start periodic connection monitoring
+      this.startConnectionMonitoring();
+
       return true;
     } catch (error) {
       console.error('❌ SignalR Connection Error:', error);
@@ -54,6 +62,7 @@ class SignalRService {
   }
 
   async disconnect() {
+    this.stopConnectionMonitoring();
     if (this.connection) {
       try {
         await this.connection.stop();
@@ -231,6 +240,26 @@ class SignalRService {
   offRoomDeleted() {
     if (this.connection) {
       this.connection.off('RoomDeleted');
+    }
+  }
+
+  startConnectionMonitoring() {
+    // Check connection status every 30 seconds
+    this.monitorInterval = setInterval(() => {
+      if (this.connection) {
+        console.log('🔍 Connection status check:', {
+          state: this.connection.state,
+          transport: this.connection.transport?.name || 'Unknown',
+          connectionId: this.connection.connectionId
+        });
+      }
+    }, 30000);
+  }
+
+  stopConnectionMonitoring() {
+    if (this.monitorInterval) {
+      clearInterval(this.monitorInterval);
+      this.monitorInterval = null;
     }
   }
 

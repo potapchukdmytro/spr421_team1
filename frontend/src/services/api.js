@@ -1,5 +1,5 @@
 // API Base URL from environment variable or default
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7041/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 // Generic API request helper
 const apiRequest = async (endpoint, options = {}) => {
