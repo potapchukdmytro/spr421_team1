@@ -26,7 +26,8 @@ const MainAppUI = () => {
   const messagesEndRef = useRef(null)
   const currentUserRef = useRef(null)
   const selectedRoomRef = useRef(null)
-  const messageSignaturesRef = useRef(new Set()) // Track message signatures to prevent duplicates
+  const processedMessageIdsRef = useRef(new Set()) // Track actual message IDs from server
+  const optimisticMessagesRef = useRef(new Map()) // Track optimistic messages: text -> timestamp
 
   // Format time helper (defined early so it's available in closures)
   const formatTime = useCallback((date) => {
@@ -84,7 +85,7 @@ const MainAppUI = () => {
       const formattedRooms = result.data.map(room => ({
         id: room.id,
         name: room.name,
-        avatar: room.name.substring(0, 2).toUpperCase(), // pfp
+        avatar: room.name.substring(0, 2).toUpperCase(),
         lastMessage: 'Click to load messages',
         time: formatTime(room.createdAt),
         unread: 0,
@@ -97,12 +98,124 @@ const MainAppUI = () => {
       }
     } else {
       console.log('⚠️ No rooms found or empty data')
-      // No rooms found - show empty state
       setRooms([])
       setSelectedRoom(null)
     }
     setLoading(false)
-  }, [])
+  }, [formatTime])
+
+  // Load messages for selected room (with optional silent mode)
+  const loadMessages = useCallback(async (roomId, silent = false) => {
+    console.log('📥 Loading messages for room:', roomId, silent ? '(silent)' : '')
+    if (!silent) {
+      setLoadingMessages(true)
+    }
+    const result = await messagesAPI.getByRoom(roomId)
+    console.log('📥 Messages API result:', result)
+    console.log('📥 Messages data:', result.data)
+    
+    if (result.success && result.data && result.data.length > 0) {
+      if (silent) {
+        // Silent mode: only append new messages we haven't seen
+        const newMessages = []
+        
+        result.data.forEach(msg => {
+          // Skip if we already have this message ID
+          if (processedMessageIdsRef.current.has(msg.id)) {
+            return
+          }
+          
+          // Track this message ID as processed
+          processedMessageIdsRef.current.add(msg.id)
+          
+          newMessages.push({
+            id: msg.id,
+            text: msg.text,
+            time: formatTime(msg.sentAt),
+            isMine: msg.userId === currentUser?.id,
+            sender: msg.user?.userName || 'User',
+            avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+          })
+        })
+        
+        if (newMessages.length > 0) {
+          console.log('📥 Silently adding', newMessages.length, 'new messages')
+          setMessages(prev => {
+            // Remove optimistic messages that match any new message
+            const withoutOptimistic = prev.filter(m => {
+              if (!m.id.startsWith('optimistic-')) return true
+              return !newMessages.some(nm => nm.text === m.text && nm.isMine)
+            })
+            return [...withoutOptimistic, ...newMessages]
+          })
+        }
+      } else {
+        // Normal mode: clear and reload all messages (for initial load)
+        processedMessageIdsRef.current.clear()
+        
+        const formattedMessages = result.data.map(msg => {
+          // Track this message ID as processed
+          processedMessageIdsRef.current.add(msg.id)
+          
+          return {
+            id: msg.id,
+            text: msg.text,
+            time: formatTime(msg.sentAt),
+            isMine: msg.userId === currentUser?.id,
+            sender: msg.user?.userName || 'User',
+            avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+          }
+        })
+        
+        console.log('📥 Formatted messages:', formattedMessages)
+        setMessages(formattedMessages)
+      }
+    } else {
+      if (!silent) {
+        // Clear processed IDs only on initial load
+        processedMessageIdsRef.current.clear()
+        
+        // Check if this is the official room and show welcome message
+        const currentRoom = rooms.find(r => r.id === roomId)
+        if (currentRoom && (currentRoom.name === 'Web Chat Official' || currentRoom.name === 'Official Web Chat')) {
+          setMessages([
+            { 
+              id: 'welcome-1', 
+              sender: 'Web Chat', 
+              avatar: 'WC', 
+              text: '🎉 Welcome to Web Chat Official!', 
+              time: '', 
+              isMine: false,
+              isSystem: true
+            },
+            { 
+              id: 'welcome-2', 
+              sender: 'Web Chat', 
+              avatar: 'WC', 
+              text: '🚀 Made by the best developers in the whole world!\n\n👨‍💻 Team:\n• Kyuuto09\n• axneo27\n• SlavaMokrynskyi\n• da2045\n• samoliukrustam123', 
+              time: '', 
+              isMine: false,
+              isSystem: true
+            },
+            { 
+              id: 'welcome-3', 
+              sender: 'Web Chat', 
+              avatar: 'WC', 
+              text: '✨ This is a real-time chat application powered by SignalR and React. Enjoy chatting!', 
+              time: '', 
+              isMine: false,
+              isSystem: true
+            }
+          ])
+        } else {
+          setMessages([])
+        }
+      }
+    }
+    if (!silent) {
+      setLoadingMessages(false)
+    }
+  }, [currentUser?.id, rooms, formatTime])
 
   // SignalR Connection
   useEffect(() => {
@@ -120,39 +233,30 @@ const MainAppUI = () => {
             return
           }
 
-          // Generate a unique signature for this message to prevent duplicates
-          const messageSignature = `${data.userName || 'Unknown'}:${data.message}:${data.roomId}`
+          console.log('📨 SignalR message received:', data)
 
-          // Check if we've already processed this message
-          if (messageSignaturesRef.current.has(messageSignature)) {
-            console.log('🔄 Duplicate message received, ignoring:', messageSignature)
-            return
-          }
-
-          // Don't add messages from current user - they're already shown via optimistic UI
+          // If this is our own message, check optimistic messages
           if (data.userName === currentUserRef.current?.name) {
-            console.log('📨 Ignoring own message (already shown optimistically):', data.userName)
-            messageSignaturesRef.current.add(messageSignature) // Mark as processed to prevent future duplicates
-            return
+            const messageText = data.message?.trim()
+            if (messageText && optimisticMessagesRef.current.has(messageText)) {
+              console.log('📨 Received own message that was sent optimistically, reloading silently')
+              optimisticMessagesRef.current.delete(messageText)
+              // Silent reload to get real message from server with proper ID
+              if (selectedRoomRef.current) {
+                loadMessages(selectedRoomRef.current.id, true) // silent = true
+              }
+              return
+            }
           }
 
-          // Mark this message as processed
-          messageSignaturesRef.current.add(messageSignature)
+          // For messages from others, silently reload to ensure consistency
+          console.log('📨 Received message from other user, reloading silently')
+          if (selectedRoomRef.current) {
+            loadMessages(selectedRoomRef.current.id, true) // silent = true
+          }
+        })
 
-          console.log('📨 New message received via SignalR from other user:', data)
-
-          setMessages(prev => {
-            const message = {
-              id: `signalr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              sender: data.userName || 'Unknown',
-              avatar: (data.userName || 'U').substring(0, 2).toUpperCase(),
-              text: data.message,
-              time: formatTime(new Date()),
-              isMine: false // Messages from SignalR listener are always from other users
-            }
-            return [...prev, message]
-          })
-        })        // Listen for room created events
+        // Listen for room created events
         signalRService.onRoomCreated(() => {
           loadRooms() // Reload rooms list
         })
@@ -191,74 +295,7 @@ const MainAppUI = () => {
       }
       signalRService.disconnect()
     }
-  }, [currentUser, formatTime, loadRooms])
-
-  // Load messages for selected room
-  const loadMessages = useCallback(async (roomId) => { // optimized, function will not recreate on each render
-    console.log('📥 Loading messages for room:', roomId)
-    setLoadingMessages(true)
-    const result = await messagesAPI.getByRoom(roomId)
-    console.log('📥 Messages API result:', result)
-    console.log('📥 Messages data:', result.data)
-    
-    if (result.success && result.data && result.data.length > 0) {
-      const formattedMessages = result.data.map(msg => ({
-        id: msg.id,
-        text: msg.text,
-        time: formatTime(msg.sentAt),
-        isMine: msg.userId === currentUser?.id,
-        sender: msg.user?.userName || 'User',
-        avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
-      }))
-      console.log('📥 Formatted messages:', formattedMessages)
-      
-      // Clear and repopulate signatures for this room
-      messageSignaturesRef.current.clear()
-      formattedMessages.forEach(msg => {
-        const messageSignature = `${msg.sender.toLowerCase().trim()}:${msg.text.trim()}`
-        messageSignaturesRef.current.add(messageSignature)
-      })
-      
-      setMessages(formattedMessages)
-    } else {
-      // Check if this is the official room and show welcome message
-      const currentRoom = rooms.find(r => r.id === roomId)
-      if (currentRoom && (currentRoom.name === 'Web Chat Official' || currentRoom.name === 'Official Web Chat')) {
-        setMessages([
-          { 
-            id: 'welcome-1', 
-            sender: 'Web Chat', 
-            avatar: 'WC', 
-            text: '🎉 Welcome to Web Chat Official!', 
-            time: '', 
-            isMine: false,
-            isSystem: true
-          },
-          { 
-            id: 'welcome-2', 
-            sender: 'Web Chat', 
-            avatar: 'WC', 
-            text: '🚀 Made by the best developers in the whole world!\n\n👨‍💻 Team:\n• Kyuuto09\n• axneo27\n• SlavaMokrynskyi\n• da2045\n• samoliukrustam123', 
-            time: '', 
-            isMine: false,
-            isSystem: true
-          },
-          { 
-            id: 'welcome-3', 
-            sender: 'Web Chat', 
-            avatar: 'WC', 
-            text: '✨ This is a real-time chat application powered by SignalR and React. Enjoy chatting!', 
-            time: '', 
-            isMine: false,
-            isSystem: true
-          }
-        ])
-      } else {
-        setMessages([])
-      }
-    }
-    setLoadingMessages(false)
-  }, [currentUser?.id, rooms, formatTime])
+  }, [currentUser, loadMessages, loadRooms])
 
   // Send message
   const handleSendMessage = async () => {
@@ -267,12 +304,13 @@ const MainAppUI = () => {
     const messageText = newMessage.trim()
     setNewMessage('') // Clear input immediately
 
-    // Generate unique message ID to prevent duplicates
-    const messageId = `optimistic-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    // Track this as an optimistic message
+    const timestamp = Date.now()
+    optimisticMessagesRef.current.set(messageText, timestamp)
 
     // Add message optimistically to UI immediately
     const optimisticMessage = {
-      id: messageId,
+      id: `optimistic-${timestamp}`,
       text: messageText,
       time: formatTime(new Date()),
       isMine: true,
@@ -280,7 +318,6 @@ const MainAppUI = () => {
       avatar: (currentUser?.name || 'ME').substring(0, 2).toUpperCase()
     }
 
-    // Add to UI immediately (don't check signatures for optimistic messages)
     setMessages(prev => [...prev, optimisticMessage])
 
     try {
@@ -290,7 +327,12 @@ const MainAppUI = () => {
 
       if (sentViaSignalR) {
         console.log('✅ Message sent successfully via SignalR')
-        // Message will be received via SignalR and deduplicated
+        // Wait a bit for SignalR callback to trigger, then silently reload to be sure
+        setTimeout(() => {
+          if (selectedRoomRef.current?.id === selectedRoom.id) {
+            loadMessages(selectedRoom.id, true) // silent = true
+          }
+        }, 500)
       } else {
         // Fallback to REST API
         console.log('⚠️ SignalR failed, using REST API fallback')
@@ -298,13 +340,14 @@ const MainAppUI = () => {
 
         if (result.success) {
           console.log('✅ Message sent successfully via REST API')
+          // Clean up optimistic tracking
+          optimisticMessagesRef.current.delete(messageText)
           // Reload messages to get the real message from server
           await loadMessages(selectedRoom.id)
-          // Remove the optimistic message since we'll get the real one
-          setMessages(prev => prev.filter(m => m.id !== messageId))
         } else {
           console.error('❌ REST API also failed:', result.error)
           // Remove optimistic message if both methods failed
+          optimisticMessagesRef.current.delete(messageText)
           setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
           alert('Failed to send message. Please try again.')
         }
@@ -312,6 +355,7 @@ const MainAppUI = () => {
     } catch (error) {
       console.error('❌ Unexpected error sending message:', error)
       // Remove optimistic message on error
+      optimisticMessagesRef.current.delete(messageText)
       setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
       alert('Failed to send message. Please check your connection.')
     }
@@ -327,8 +371,9 @@ const MainAppUI = () => {
   // Load messages when room changes
   useEffect(() => {
     if (selectedRoom) {
-      // Clear signatures when switching rooms
-      messageSignaturesRef.current.clear()
+      // Clear tracking when switching rooms
+      processedMessageIdsRef.current.clear()
+      optimisticMessagesRef.current.clear()
       loadMessages(selectedRoom.id)
     }
   }, [selectedRoom, loadMessages])
@@ -341,44 +386,46 @@ const MainAppUI = () => {
       try {
         const result = await messagesAPI.getByRoom(selectedRoom.id)
         if (result.success && result.data && result.data.length > 0) {
-          setMessages(prev => {
-            const newMessages = []
-            const existingSignatures = new Set(messageSignaturesRef.current)
-            
-            result.data.forEach(msg => {
-              const messageSignature = `${(msg.user?.userName || 'User').toLowerCase().trim()}:${msg.text.trim()}`
-              
-              // Skip if we've already seen this message
-              if (existingSignatures.has(messageSignature)) {
-                return
-              }
-              
-              // Add new message
-              messageSignaturesRef.current.add(messageSignature)
-              newMessages.push({
-                id: msg.id,
-                text: msg.text,
-                time: formatTime(msg.sentAt),
-                isMine: msg.userId === currentUser?.id,
-                sender: msg.user?.userName || 'User',
-                avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
-              })
-            })
-            
-            if (newMessages.length > 0) {
-              console.log('📊 Polling found', newMessages.length, 'new messages')
-              return [...prev, ...newMessages]
+          const newMessages = []
+          
+          result.data.forEach(msg => {
+            // Skip if we already have this message ID
+            if (processedMessageIdsRef.current.has(msg.id)) {
+              return
             }
-            return prev
+            
+            // Add this message ID to processed set
+            processedMessageIdsRef.current.add(msg.id)
+            
+            newMessages.push({
+              id: msg.id,
+              text: msg.text,
+              time: formatTime(msg.sentAt),
+              isMine: msg.userId === currentUser?.id,
+              sender: msg.user?.userName || 'User',
+              avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+            })
           })
+          
+          if (newMessages.length > 0) {
+            console.log('📊 Polling found', newMessages.length, 'new messages')
+            setMessages(prev => {
+              // Remove optimistic messages that match any new message text
+              const withoutOptimistic = prev.filter(m => {
+                if (!m.id.startsWith('optimistic-')) return true
+                return !newMessages.some(nm => nm.text === m.text && nm.isMine)
+              })
+              return [...withoutOptimistic, ...newMessages]
+            })
+          }
         }
       } catch (error) {
         console.error('❌ Polling error:', error)
       }
-    }, 4000) // Poll every 4 seconds
+    }, 3000) // Poll every 3 seconds
 
     return () => clearInterval(pollInterval)
-  }, [selectedRoom, messages, loadMessages])
+  }, [selectedRoom, currentUser?.id, formatTime, messages])
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -493,7 +540,7 @@ const MainAppUI = () => {
           <div className="modal-content" style={{ maxWidth: '400px' }}>
             <h3 style={{ color: 'var(--brand-primary)', marginBottom: '16px' }}>Delete Room?</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.6' }}>
-              Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>\u201c{roomToDelete.name}\u201d</strong>? 
+              Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>"{roomToDelete.name}"</strong>? 
               This action cannot be undone and all messages will be permanently deleted.
             </p>
             <div className="modal-actions">
