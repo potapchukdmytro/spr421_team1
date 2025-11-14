@@ -102,7 +102,6 @@ export const authAPI = {
     try {
       // Decode JWT token (simple base64 decode, not cryptographically secure but works for reading)
       const payload = JSON.parse(atob(token.split('.')[1]))
-      console.log('Decoded JWT payload:', payload) // Debug log
       return {
         id: payload.id || payload.sub,
         userName: payload.userName || payload.name,

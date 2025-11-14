@@ -326,7 +326,7 @@ const MainAppUI = () => {
       } catch (error) {
         console.error('❌ Polling error:', error)
       }
-    }, 2000) // Poll every 2 seconds
+    }, 4000) // Poll every 4 seconds
 
     return () => clearInterval(pollInterval)
   }, [selectedRoom, messages, loadMessages])
