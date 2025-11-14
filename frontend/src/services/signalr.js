@@ -23,16 +23,29 @@ class SignalRService {
       }
 
       this.connection = new signalR.HubConnectionBuilder()
-        .withUrl(`${SIGNALR_BASE_URL}/hubs/chat`, {
-          accessTokenFactory: () => token,
+        .withUrl(`${SIGNALR_BASE_URL}/hubs/chat?access_token=${token}`, {
           transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling
         })
         .withAutomaticReconnect()
         .configureLogging(signalR.LogLevel.Information)
         .build();
 
+      // Add connection event handlers
+      this.connection.onclose(() => {
+        console.log('🔌 SignalR connection closed');
+      });
+
+      this.connection.onreconnecting(() => {
+        console.log('🔄 SignalR reconnecting...');
+      });
+
+      this.connection.onreconnected(() => {
+        console.log('✅ SignalR reconnected!');
+      });
+
       await this.connection.start();
       console.log('✅ SignalR Connected!', this.connection.connectionId);
+      console.log('✅ Connection state:', this.connection.state);
       return true;
     } catch (error) {
       console.error('❌ SignalR Connection Error:', error);

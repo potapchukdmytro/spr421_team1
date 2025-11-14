@@ -26,15 +26,18 @@ namespace web_chat.Hubs
         public override async Task OnConnectedAsync()
         {
             var userId = GetUserId();
+            Console.WriteLine($"🔗 User {userId} connected with connectionId {Context.ConnectionId}");
 
             // Можливо потім: змінювати статус користувача на "онлайн - true"
 
             var response = await _userRoomService.GetUserRoomsAsync(userId);
             var userRooms = response.Data as List<string> ?? new List<string>();
+            Console.WriteLine($"🏠 User {userId} is member of rooms: {string.Join(", ", userRooms)}");
 
             foreach (var roomId in userRooms) // Під'єднуємо користувача до його кімнат
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, roomId); 
+                Console.WriteLine($"➕ Added user {userId} to group {roomId}");
             }
 
             await base.OnConnectedAsync();
@@ -44,6 +47,7 @@ namespace web_chat.Hubs
         {
             var userId = GetUserId();
             var userName = Context.User?.Identity?.Name;
+            Console.WriteLine($"📤 Sending message from {userName} ({userId}) to room {roomId}: {message}");
 
             // Save message to database
             var messageEntity = new MessageEntity
@@ -60,7 +64,9 @@ namespace web_chat.Hubs
             await _context.SaveChangesAsync();
 
             // Broadcast message via SignalR
+            Console.WriteLine($"📡 Broadcasting message to group {roomId}");
             await Clients.Group(roomId).SendAsync("ReceiveMessage", new {userName, message, roomId});
+            Console.WriteLine($"✅ Message broadcasted to room {roomId}");
         }
         public async Task SendToSome(string message, List<string> roomIds)
         {

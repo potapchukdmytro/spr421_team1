@@ -109,30 +109,32 @@ const MainAppUI = () => {
       if (!currentUser) return
 
       const connected = await signalRService.connect()
+      console.log('🔗 SignalR connection result:', connected)
 
       if (connected) {
         // Set up persistent message listener that works for all rooms
         signalRService.onReceiveMessage((data) => {
-          console.log('📨 Received message via SignalR:', data)
+          console.log('📨 RECEIVED MESSAGE via SignalR:', data)
           console.log('📨 Current room:', selectedRoomRef.current?.id, 'Message room:', data.roomId)
           console.log('📨 Current user:', currentUserRef.current?.name, 'Message from:', data.userName)
+          console.log('📨 Connection state:', signalRService.isConnected())
 
           // Only process if message is for the currently selected room
           if (!selectedRoomRef.current || data.roomId !== selectedRoomRef.current.id) {
             console.log('⏭️ Skipping message - different room or no room selected')
             return
           }
-
+          
           // Check if this is our own message (we already showed it optimistically)
           const isOwnMessage = currentUserRef.current && data.userName === currentUserRef.current.name
-
+          
           if (isOwnMessage) {
             console.log('⏭️ Skipping own message (already shown optimistically)')
             return
           }
-
+          
           // Add message from other users
-          console.log('✅ Adding message from other user')
+          console.log('✅ Adding message from other user to UI')
           setMessages(prev => {
             const message = {
               id: `msg-${Date.now()}-${Math.random()}`,
@@ -144,9 +146,7 @@ const MainAppUI = () => {
             }
             return [...prev, message]
           })
-        })
-
-        // Listen for room created events
+        })        // Listen for room created events
         signalRService.onRoomCreated(() => {
           loadRooms() // Reload rooms list
         })
