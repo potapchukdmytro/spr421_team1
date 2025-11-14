@@ -49,44 +49,7 @@ const MainAppUI = () => {
   // Update selectedRoomRef when selectedRoom changes
   useEffect(() => {
     selectedRoomRef.current = selectedRoom
-    
-    // Re-register SignalR listener with fresh closure when room changes
-    if (signalRService.isConnected()) {
-      signalRService.onReceiveMessage((data) => {
-        console.log('📨 Received message via SignalR:', data)
-        console.log('📨 Current room:', selectedRoomRef.current?.id, 'Message room:', data.roomId)
-        console.log('📨 Current user:', currentUserRef.current?.name, 'Message from:', data.userName)
-        
-        // Only process if message is for the currently selected room
-        if (!selectedRoomRef.current || data.roomId !== selectedRoomRef.current.id) {
-          console.log('⏭️ Skipping message - different room')
-          return
-        }
-        
-        // Check if this is our own message (we already showed it optimistically)
-        const isOwnMessage = currentUserRef.current && data.userName === currentUserRef.current.name
-        
-        if (isOwnMessage) {
-          console.log('⏭️ Skipping own message (already shown optimistically)')
-          return
-        }
-        
-        // Add message from other users
-        console.log('✅ Adding message from other user')
-        setMessages(prev => {
-          const message = {
-            id: `msg-${Date.now()}-${Math.random()}`,
-            sender: data.userName || 'Unknown',
-            avatar: (data.userName || 'U').substring(0, 2).toUpperCase(),
-            text: data.message,
-            time: formatTime(new Date()),
-            isMine: false
-          }
-          return [...prev, message]
-        })
-      })
-    }
-  }, [selectedRoom, formatTime])
+  }, [selectedRoom])
 
   // Get current user from token
   useEffect(() => {
@@ -148,9 +111,41 @@ const MainAppUI = () => {
       const connected = await signalRService.connect()
 
       if (connected) {
-        // Note: ReceiveMessage listener is registered in selectedRoom useEffect
-        // to ensure fresh closure with current room state
-        
+        // Set up persistent message listener that works for all rooms
+        signalRService.onReceiveMessage((data) => {
+          console.log('📨 Received message via SignalR:', data)
+          console.log('📨 Current room:', selectedRoomRef.current?.id, 'Message room:', data.roomId)
+          console.log('📨 Current user:', currentUserRef.current?.name, 'Message from:', data.userName)
+
+          // Only process if message is for the currently selected room
+          if (!selectedRoomRef.current || data.roomId !== selectedRoomRef.current.id) {
+            console.log('⏭️ Skipping message - different room or no room selected')
+            return
+          }
+
+          // Check if this is our own message (we already showed it optimistically)
+          const isOwnMessage = currentUserRef.current && data.userName === currentUserRef.current.name
+
+          if (isOwnMessage) {
+            console.log('⏭️ Skipping own message (already shown optimistically)')
+            return
+          }
+
+          // Add message from other users
+          console.log('✅ Adding message from other user')
+          setMessages(prev => {
+            const message = {
+              id: `msg-${Date.now()}-${Math.random()}`,
+              sender: data.userName || 'Unknown',
+              avatar: (data.userName || 'U').substring(0, 2).toUpperCase(),
+              text: data.message,
+              time: formatTime(new Date()),
+              isMine: false
+            }
+            return [...prev, message]
+          })
+        })
+
         // Listen for room created events
         signalRService.onRoomCreated(() => {
           loadRooms() // Reload rooms list
@@ -181,9 +176,16 @@ const MainAppUI = () => {
 
     // Cleanup on unmount
     return () => {
+      if (signalRService.isConnected()) {
+        signalRService.offReceiveMessage()
+        signalRService.offRoomCreated()
+        signalRService.offUserJoined()
+        signalRService.offUserLeft()
+        signalRService.offRoomDeleted()
+      }
       signalRService.disconnect()
     }
-  }, [currentUser])
+  }, [currentUser, formatTime, loadRooms])
 
   // Load messages for selected room
   const loadMessages = useCallback(async (roomId) => { // optimized, function will not recreate on each render
