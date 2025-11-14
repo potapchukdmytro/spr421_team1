@@ -61,7 +61,7 @@ const MainAppUI = () => {
         id: user.id,
         name: user.userName || user.email?.split('@')[0] || 'User',
         email: user.email,
-        avatar: (user.userName || user.email?.split('@')[0] || 'U').substring(0, 2).toUpperCase()
+        avatar: (user.userName || user.email?.split('@')[0] || 'User').substring(0, 2).toUpperCase()
       }
       setCurrentUser(userData)
       currentUserRef.current = userData
@@ -133,8 +133,8 @@ const MainAppUI = () => {
             text: msg.text,
             time: formatTime(msg.sentAt),
             isMine: msg.userId === currentUser?.id,
-            sender: msg.user?.userName || 'User',
-            avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+            sender: msg.userName || 'User',
+            avatar: (msg.userName || 'User').substring(0, 2).toUpperCase()
           })
         })
         
@@ -162,8 +162,8 @@ const MainAppUI = () => {
             text: msg.text,
             time: formatTime(msg.sentAt),
             isMine: msg.userId === currentUser?.id,
-            sender: msg.user?.userName || 'User',
-            avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+            sender: msg.userName || 'User',
+            avatar: (msg.userName || 'User').substring(0, 2).toUpperCase()
           }
         })
         
@@ -402,8 +402,8 @@ const MainAppUI = () => {
               text: msg.text,
               time: formatTime(msg.sentAt),
               isMine: msg.userId === currentUser?.id,
-              sender: msg.user?.userName || 'User',
-              avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+              sender: msg.userName || 'User',
+              avatar: (msg.userName || 'User').substring(0, 2).toUpperCase()
             })
           })
           
@@ -835,15 +835,27 @@ const MainAppUI = () => {
                   <span>Start the conversation!</span>
                 </div>
               ) : (
-                messages.map(msg => (
-                  <div key={msg.id} className={`message ${msg.isMine ? 'mine' : 'theirs'}`}>
-                    {!msg.isMine && <div className="message-avatar">{msg.avatar}</div>}
-                    <div className="message-content">
-                      <div className="message-bubble">{msg.text}</div>
-                      <span className="message-time">{msg.time}</span>
+                messages.map(msg => {
+                  // Prepare tooltip text with username and email if available
+                  const tooltipText = msg.isMine && currentUser?.email 
+                    ? `${msg.sender} (${currentUser.email})` 
+                    : msg.sender
+                    
+                  return (
+                    <div key={msg.id} className={`message ${msg.isMine ? 'mine' : 'theirs'}`} title={tooltipText}>
+                      {!msg.isMine && (
+                        <div className="message-avatar-container">
+                          <div className="message-avatar" title={tooltipText}>{msg.avatar}</div>
+                          <span className="message-avatar-name">{msg.sender}</span>
+                        </div>
+                      )}
+                      <div className="message-content">
+                        <div className="message-bubble">{msg.text}</div>
+                        <span className="message-time">{msg.time}</span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
               <div ref={messagesEndRef} />
             </div>
