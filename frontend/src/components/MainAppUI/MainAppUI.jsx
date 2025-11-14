@@ -17,7 +17,6 @@ const MainAppUI = () => {
   const [signalRConnected, setSignalRConnected] = useState(false)
   const messagesEndRef = useRef(null)
 
-  // ⭐ FIX: persist the *actual latest* room & user so SignalR handlers use correct values
   const selectedRoomRef = useRef(null)
   const currentUserRef = useRef(null)
 

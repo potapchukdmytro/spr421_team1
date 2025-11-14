@@ -115,7 +115,7 @@ builder.Services.AddCors(options =>
 // Налаштування DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db")); // Рядок підключення до бази даних
+    options.UseNpgsql(builder.Configuration.GetConnectionString("hosted_db2")); // Рядок підключення до бази даних
 });
 
 builder.Services.AddEndpointsApiExplorer();
