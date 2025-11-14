@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { authAPI, roomsAPI, messagesAPI } from '../../services/api'
+import { authAPI, roomsAPI, messagesAPI, userRoomsAPI } from '../../services/api'
+import { signalRService } from '../../services/signalr'
+import RoomManager from '../RoomManager/RoomManager'
 import './MainAppUI.css'
 
 const MainAppUI = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [isRoomManagerOpen, setIsRoomManagerOpen] = useState(false)
   const [selectedRoom, setSelectedRoom] = useState(null)
   const [rooms, setRooms] = useState([])
   const [messages, setMessages] = useState([])
@@ -11,9 +14,22 @@ const MainAppUI = () => {
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [signalRConnected, setSignalRConnected] = useState(false)
   const messagesEndRef = useRef(null)
 
-  // Get current user from token or use demo user
+  // ⭐ FIX: persist the *actual latest* room & user so SignalR handlers use correct values
+  const selectedRoomRef = useRef(null)
+  const currentUserRef = useRef(null)
+
+  useEffect(() => {
+    selectedRoomRef.current = selectedRoom
+  }, [selectedRoom])
+
+  useEffect(() => {
+    currentUserRef.current = currentUser
+  }, [currentUser])
+
+  // Load current user
   useEffect(() => {
     const user = authAPI.getCurrentUser()
     if (user) {
@@ -21,10 +37,11 @@ const MainAppUI = () => {
         id: user.id,
         name: user.userName || user.email?.split('@')[0] || 'User',
         email: user.email,
-        avatar: (user.userName || user.email?.split('@')[0] || 'U').substring(0, 2).toUpperCase()
+        avatar: (user.userName || user.email?.split('@')[0] || 'U')
+          .substring(0, 2)
+          .toUpperCase()
       })
     } else {
-      // Demo user for development
       setCurrentUser({
         id: 'demo-user',
         name: 'Demo User',
@@ -34,13 +51,81 @@ const MainAppUI = () => {
     }
   }, [])
 
-  // Load rooms from API
+  // Initialize SignalR
+  useEffect(() => {
+    if (currentUser && currentUser.id !== 'demo-user') {
+      initializeSignalR()
+    }
+
+    return () => {
+      if (signalRService.connection) signalRService.stop()
+    }
+  }, [currentUser])
+
+  const initializeSignalR = async () => {
+    try {
+      await signalRService.start()
+      setSignalRConnected(true)
+
+      // ⭐ All handlers now use refs (new stable functions)
+      signalRService.on('ReceiveMessage', onReceiveMessage)
+      signalRService.on('RoomCreated', () => loadRooms())
+      signalRService.on('UserJoined', data => console.log('User joined', data))
+      signalRService.on('UserLeft', data => console.log('User left', data))
+
+      signalRService.on('RoomAdded', data => {
+        if (data.userId === currentUserRef.current?.id) loadRooms()
+      })
+
+    } catch (error) {
+      console.error('SignalR connection failed:', error)
+      setSignalRConnected(false)
+    }
+  }
+
+  // ⭐ FIXED ReceiveMessage (no more stale closures!)
+  const onReceiveMessage = (data) => {
+    const realId = data.id
+
+    const incoming = {
+      id: realId,
+      text: data.message,
+      time: formatTime(new Date(data.sentAt)),
+      isMine: data.userId === currentUserRef.current?.id,
+      sender: data.userName,
+      avatar: (() => {
+        const name = data.userName;
+        if (name.length >= 2) return name.substring(0, 2).toUpperCase();
+        return (name + name).substring(0, 2).toUpperCase(); // Repeat first letter if only 1 char
+      })()
+    }
+
+    setMessages(prev => {
+      // ⭐ Remove the temp message from this user, if any
+      const filtered = prev.filter(m =>
+        !(m.isMine && m.tempId)    // remove temp
+      )
+
+      // ⭐ Prevent accidental duplicates
+      if (filtered.some(m => m.id === realId)) return filtered
+
+      return [...filtered, incoming]
+    })
+  }
+
+
+  // Load rooms
   const loadRooms = useCallback(async () => {
+    if (!currentUser?.id || currentUser.id === 'demo-user') {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
-    const result = await roomsAPI.getAll()
-    
-    if (result.success && result.data && result.data.length > 0) {
-      const formattedRooms = result.data.map(room => ({
+    const result = await userRoomsAPI.getUserRooms(currentUser.id)
+
+    if (result.success && result.data) {
+      const formatted = result.data.map(room => ({
         id: room.id,
         name: room.name,
         avatar: room.name.substring(0, 2).toUpperCase(),
@@ -48,103 +133,94 @@ const MainAppUI = () => {
         time: formatTime(room.createdAt),
         unread: 0,
         online: false,
-        isPrivate: room.isPrivate
+        isPrivate: room.isPrivate,
+        createdById: room.createdById
       }))
-      setRooms(formattedRooms)
-      if (formattedRooms.length > 0) {
-        setSelectedRoom(formattedRooms[0])
+      setRooms(formatted)
+      if (formatted.length > 0 && !selectedRoomRef.current) {
+        setSelectedRoom(formatted[0])
       }
     } else {
-      // No rooms found - show empty state
       setRooms([])
       setSelectedRoom(null)
     }
     setLoading(false)
-  }, [])
+  }, [currentUser])
 
-  // Load messages for selected room
+  // Load messages for room
   const loadMessages = useCallback(async (roomId) => {
     setLoadingMessages(true)
     const result = await messagesAPI.getByRoom(roomId)
-    
+
     if (result.success && result.data) {
-      const formattedMessages = result.data.map(msg => ({
+      const formatted = result.data.map(msg => ({
         id: msg.id,
         text: msg.text,
         time: formatTime(msg.sentAt),
         isMine: msg.userId === currentUser?.id,
-        sender: msg.user?.userName || 'User',
-        avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+        sender: msg.userName || 'Unknown User',
+        avatar: (() => {
+          const name = msg.userName || 'U';
+          if (name.length >= 2) return name.substring(0, 2).toUpperCase();
+          return (name + name).substring(0, 2).toUpperCase(); // Repeat first letter if only 1 char
+        })()
       }))
-      setMessages(formattedMessages)
+      setMessages(formatted)
     } else {
-      // Fallback to mock messages
-      setMessages([
-        { id: 1, sender: 'Dmytro Potapchuk', avatar: 'DP', text: 'Hey! How are you?', time: '10:25', isMine: false },
-        { id: 2, sender: 'Me', text: 'Great! Just working on the chat UI', time: '10:26', isMine: true },
-        { id: 3, sender: 'Dmytro Potapchuk', avatar: 'DP', text: 'Awesome! Can\'t wait to see it', time: '10:28', isMine: false },
-        { id: 4, sender: 'Me', text: 'It\'s looking really good! Check it out soon 🚀', time: '10:30', isMine: true },
-      ])
+      setMessages([])
     }
     setLoadingMessages(false)
   }, [currentUser?.id])
 
-  // Send message
+  // ⭐ FIX: Force message to appear instantly on send
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedRoom) return
 
-    // Optimistic update
-    const tempMessage = {
-      id: Date.now(),
-      text: newMessage,
-      time: formatTime(new Date()),
-      isMine: true,
-      sender: currentUser?.name || 'Me'
-    }
-    setMessages(prev => [...prev, tempMessage])
+    const msg = newMessage.trim()
     setNewMessage('')
 
-    // Send to backend
-    const result = await messagesAPI.send(selectedRoom.id, newMessage)
-    if (result.success) {
-      loadMessages(selectedRoom.id) // Reload to get real message
+    // Create a provisional local message
+    const tempId = "local-" + Date.now()
+    const tempMsg = {
+      id: tempId,
+      tempId,         
+      text: msg,
+      time: formatTime(new Date()),
+      isMine: true,
+      sender: currentUser?.name,
+      avatar: currentUser?.avatar
+    }
+
+    setMessages(prev => [...prev, tempMsg])
+
+    try {
+      if (signalRConnected) {
+        await signalRService.sendMessage(msg, selectedRoom.id)
+      } else {
+        await messagesAPI.send(selectedRoom.id, msg)
+      }
+    } catch (e) {
+      console.error("Send message failed", e)
     }
   }
 
-  // Format time helper
+  // Time formatting
   const formatTime = (date) => {
-    if (!date) return ''
     const d = new Date(date)
-    const now = new Date()
-    const diff = now - d
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
-    if (days === 0) {
-      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-    } else if (days === 1) {
-      return 'Yesterday'
-    } else if (days < 7) {
-      return d.toLocaleDateString('en-US', { weekday: 'long' })
-    } else {
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    }
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
 
   // Load rooms on mount
   useEffect(() => {
-    if (currentUser) {
-      loadRooms()
-    }
+    if (currentUser) loadRooms()
   }, [currentUser, loadRooms])
 
   // Load messages when room changes
   useEffect(() => {
-    if (selectedRoom) {
-      loadMessages(selectedRoom.id)
-    }
+    if (selectedRoom) loadMessages(selectedRoom.id)
   }, [selectedRoom, loadMessages])
 
-  // Auto scroll to bottom
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -160,7 +236,11 @@ const MainAppUI = () => {
       <div className="sidebar">
         <div className="sidebar-header">
           <h2>Web Chat</h2>
-          <button className="new-chat-btn" title="New Chat">
+          <button
+            className="new-chat-btn"
+            title="Manage Rooms"
+            onClick={() => setIsRoomManagerOpen(true)}
+          >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
@@ -195,7 +275,31 @@ const MainAppUI = () => {
                 <div className="chat-info">
                   <div className="chat-top">
                     <span className="chat-name">{room.name}</span>
-                    <span className="chat-time">{room.time}</span>
+                    <div className="room-actions">
+                      {room.createdById === currentUser?.id ? (
+                        <button 
+                          className="action-btn delete-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteRoom(room.id, room.name)
+                          }}
+                          title="Delete room"
+                        >
+                          🗑️
+                        </button>
+                      ) : (
+                        <button 
+                          className="action-btn leave-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleLeaveRoom(room.id, room.name)
+                          }}
+                          title="Leave room"
+                        >
+                          🚪
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="chat-bottom">
                     <span className="chat-last-message">{room.lastMessage}</span>
@@ -352,6 +456,21 @@ const MainAppUI = () => {
           </div>
         )}
       </div>
+
+      {/* Room Manager Modal */}
+      {isRoomManagerOpen && (
+        <RoomManager
+          currentUser={currentUser}
+          onRoomCreated={() => {
+            loadRooms()
+            setIsRoomManagerOpen(false)
+          }}
+          onRoomUpdated={() => {
+            loadRooms()
+          }}
+          onClose={() => setIsRoomManagerOpen(false)}
+        />
+      )}
     </div>
   )
 }

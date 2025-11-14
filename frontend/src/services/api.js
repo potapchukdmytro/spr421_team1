@@ -1,5 +1,5 @@
 // API Base URL from environment variable or default
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7041/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 // Generic API request helper
 const apiRequest = async (endpoint, options = {}) => {
@@ -45,14 +45,15 @@ const apiRequest = async (endpoint, options = {}) => {
       }
     }
 
-    // Backend returns: { isSuccess, message, payload }
+    // Backend returns: { isSuccess, message, data, payload }
     // Check if response indicates failure
     if (data.isSuccess === false) {
       return { 
         success: false, 
         isSuccess: false,
         error: data.message || 'Request failed',
-        message: data.message || 'Request failed'
+        message: data.message || 'Request failed',
+        status: response.status
       }
     }
 
@@ -60,9 +61,10 @@ const apiRequest = async (endpoint, options = {}) => {
     return { 
       success: true, 
       isSuccess: true,
-      data: data.payload,
-      payload: data.payload,
-      message: data.message
+      data: data.data || data.payload,
+      payload: data.data || data.payload,
+      message: data.message,
+      status: response.status
     }
   } catch (error) {
     console.error('API Error:', error)
@@ -134,14 +136,27 @@ export const roomsAPI = {
   },
 
   getById: async (id) => {
-    return await apiRequest(`/rooms/${id}`)
+    return await apiRequest(`/rooms/by-id?roomId=${id}`)
+  },
+
+  update: async (roomId, data) => {
+    return await apiRequest('/rooms', {
+      method: 'PUT',
+      body: JSON.stringify({ id: roomId, ...data }),
+    })
+  },
+
+  delete: async (roomId) => {
+    return await apiRequest(`/rooms?roomId=${roomId}`, {
+      method: 'DELETE',
+    })
   }
 }
 
 // Messages API
 export const messagesAPI = {
   getByRoom: async (roomId) => {
-    return await apiRequest(`/rooms/${roomId}/messages`)
+    return await apiRequest(`/messages/room/${roomId}`)
   },
 
   send: async (roomId, text) => {
@@ -154,6 +169,10 @@ export const messagesAPI = {
 
 // Users API
 export const usersAPI = {
+  search: async (query) => {
+    return await apiRequest(`/users/search?query=${encodeURIComponent(query)}`)
+  },
+
   getProfile: async () => {
     return await apiRequest('/users/profile')
   },
@@ -162,6 +181,38 @@ export const usersAPI = {
     return await apiRequest('/users/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
+    })
+  }
+}
+
+// User Rooms API
+export const userRoomsAPI = {
+  getUserRooms: async (userId) => {
+    return await apiRequest(`/user-rooms/by-userId?userId=${userId}`)
+  },
+
+  getUserRoomId: async (userId, roomId) => {
+    return await apiRequest(`/user-rooms/user-room-id?userId=${userId}&roomId=${roomId}`)
+  },
+
+  joinRoom: async (userId, roomId) => {
+    return await apiRequest('/user-rooms/join', {
+      method: 'POST',
+      body: JSON.stringify({ userId, roomId }),
+    })
+  },
+
+  leaveRoom: async (userRoomId) => {
+    return await apiRequest('/user-rooms/remove-member', {
+      method: 'DELETE',
+      body: JSON.stringify(userRoomId),
+    })
+  },
+
+  updateStatus: async (userRoomId, status) => {
+    return await apiRequest('/user-rooms/update-status', {
+      method: 'PUT',
+      body: JSON.stringify({ id: userRoomId, status }),
     })
   }
 }
