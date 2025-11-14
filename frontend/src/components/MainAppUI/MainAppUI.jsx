@@ -230,6 +230,94 @@ const MainAppUI = () => {
     window.location.href = '/'
   }
 
+  // Handle leaving a room
+  const handleLeaveRoom = async (roomId, roomName) => {
+    if (!currentUser?.id) return
+
+    // Confirm with user
+    if (!window.confirm(`Are you sure you want to leave "${roomName}"?`)) {
+      return
+    }
+
+    try {
+      // Get the user room ID first
+      const userRoomResult = await userRoomsAPI.getUserRoomId(currentUser.id, roomId)
+      if (!userRoomResult.success || !userRoomResult.data) {
+        alert('Failed to find room membership')
+        return
+      }
+
+      const userRoomId = userRoomResult.data
+
+      // Leave via SignalR if connected
+      if (signalRConnected) {
+        await signalRService.leaveRoom(roomId)
+      }
+
+      // Leave via API
+      const leaveResult = await userRoomsAPI.leaveRoom(userRoomId)
+      if (leaveResult.success) {
+        // Remove room from local state
+        setRooms(prev => prev.filter(room => room.id !== roomId))
+        
+        // If this was the selected room, select another room or clear selection
+        if (selectedRoom?.id === roomId) {
+          const remainingRooms = rooms.filter(room => room.id !== roomId)
+          if (remainingRooms.length > 0) {
+            setSelectedRoom(remainingRooms[0])
+          } else {
+            setSelectedRoom(null)
+            setMessages([])
+          }
+        }
+        
+        console.log('Successfully left room:', roomName)
+      } else {
+        alert('Failed to leave room: ' + (leaveResult.error || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error leaving room:', error)
+      alert('Error leaving room')
+    }
+  }
+
+  // Handle deleting a room (only for room creator)
+  const handleDeleteRoom = async (roomId, roomName) => {
+    if (!currentUser?.id) return
+
+    // Confirm with user
+    if (!window.confirm(`Are you sure you want to delete "${roomName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      // Delete via API
+      const deleteResult = await roomsAPI.delete(roomId)
+      if (deleteResult.success) {
+        // Remove room from local state
+        setRooms(prev => prev.filter(room => room.id !== roomId))
+        
+        // If this was the selected room, select another room or clear selection
+        if (selectedRoom?.id === roomId) {
+          const remainingRooms = rooms.filter(room => room.id !== roomId)
+          if (remainingRooms.length > 0) {
+            setSelectedRoom(remainingRooms[0])
+          } else {
+            setSelectedRoom(null)
+            setMessages([])
+          }
+        }
+        
+        console.log('Successfully deleted room:', roomName)
+      } else {
+        alert('Failed to delete room: ' + (deleteResult.error || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('Error deleting room:', error)
+      alert('Error deleting room')
+    }
+  }
+
   return (
     <div className="app-layout">
       {/* Left Sidebar */}
