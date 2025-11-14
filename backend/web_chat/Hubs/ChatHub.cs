@@ -4,6 +4,8 @@ using web_chat.BLL.Dtos.UserRoom;
 using web_chat.BLL.Dtos.Room;
 using web_chat.BLL.Services.RoomService;
 using web_chat.BLL.Services.UserRoomService;
+using web_chat.DAL;
+using web_chat.DAL.Entities;
 
 namespace web_chat.Hubs
 {
@@ -12,10 +14,13 @@ namespace web_chat.Hubs
     {
         private readonly IUserRoomService _userRoomService;
         private readonly IRoomService _roomService;
-        public ChatHub(IUserRoomService userRoomService, IRoomService roomService)
+        private readonly AppDbContext _context;
+        
+        public ChatHub(IUserRoomService userRoomService, IRoomService roomService, AppDbContext context)
         {
             _userRoomService = userRoomService;
             _roomService = roomService;
+            _context = context;
         }
 
         public override async Task OnConnectedAsync()
@@ -37,18 +42,32 @@ namespace web_chat.Hubs
 
         public async Task Send(string message, string roomId)
         {
+            var userId = GetUserId();
             var userName = Context.User?.Identity?.Name;
 
-            await Clients.Group(roomId).SendAsync("ReceiveMessage", new {userName, message});
+            // Save message to database
+            var messageEntity = new MessageEntity
+            {
+                Id = Guid.NewGuid().ToString(),
+                Text = message,
+                UserId = userId,
+                RoomId = roomId,
+                SentAt = DateTime.UtcNow,
+                CreatedDate = DateTime.UtcNow
+            };
+            
+            _context.Messages.Add(messageEntity);
+            await _context.SaveChangesAsync();
 
-            //todo : зберігати повідомлення в БД
+            // Broadcast message via SignalR
+            await Clients.Group(roomId).SendAsync("ReceiveMessage", new {userName, message, roomId});
         }
         public async Task SendToSome(string message, List<string> roomIds)
         {
             foreach (var roomId in roomIds)
             {
                 var userName = Context.User?.Identity?.Name;
-                await Clients.Group(roomId).SendAsync("ReceiveMessage", new { userName, message });
+                await Clients.Group(roomId).SendAsync("ReceiveMessage", new { userName, message, roomId });
             }
         }
         public async Task CreateRoom(string roomName, bool isPrivate, List<string> userIds)

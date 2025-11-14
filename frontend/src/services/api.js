@@ -135,13 +135,28 @@ export const roomsAPI = {
 
   getById: async (id) => {
     return await apiRequest(`/rooms/${id}`)
+  },
+
+  update: async (roomId, name) => {
+    return await apiRequest('/rooms', {
+      method: 'PUT',
+      body: JSON.stringify({ id: roomId, name }),
+    })
+  },
+
+  delete: async (roomId) => {
+    return await apiRequest(`/rooms?roomId=${roomId}`, {
+      method: 'DELETE',
+    })
   }
 }
 
 // Messages API
 export const messagesAPI = {
   getByRoom: async (roomId) => {
-    return await apiRequest(`/rooms/${roomId}/messages`)
+    const user = authAPI.getCurrentUser()
+    const userId = user?.id || ''
+    return await apiRequest(`/rooms/messages?roomId=${roomId}&userId=${userId}`)
   },
 
   send: async (roomId, text) => {

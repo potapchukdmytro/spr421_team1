@@ -284,14 +284,16 @@
   cursor: pointer;
   transition: background 0.15s ease;
   text-align: left;
+  text-decoration: none; /* For Link elements */
 }
 
 .dropdown-item:hover {
   background: var(--surface-color);
+  text-decoration: none; /* Prevent underline on hover for Link */
 }
 
 .dropdown-item.logout {
-  color: #ef4444;
+  color: var(--status-error); /* <-- FIXED */
 }
 
 .dropdown-item.logout:hover {
@@ -360,12 +362,14 @@
 
 .online-status {
   font-size: 12px;
-  color: #10b981;
+  color: var(--status-success); /* <-- FIXED */
 }
 
 .chat-header-actions {
   display: flex;
   gap: 6px;
+  position: relative;
+  z-index: 100;
 }
 
 .header-btn {
@@ -765,3 +769,219 @@
   font-size: 14px;
   color: var(--text-tertiary);
 }
+
+/* ===== NEW ROOM MODAL ===== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  /* --- FIXED --- */
+  background-color: var(--background-light); /* <- War --bg-primary */
+  padding: 24px;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-content h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  /* --- FIXED --- */
+  background-color: var(--surface-color); /* <- War --bg-secondary */
+  color: var(--text-primary);
+  font-size: 14px;
+  margin-bottom: 16px;
+  font-family: var(--font-sans);
+  transition: border-color 0.2s ease;
+}
+
+.modal-input:focus {
+  outline: none;
+  /* --- FIXED --- */
+  border-color: var(--brand-primary); /* <- War --accent-color */
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-sans);
+}
+
+.modal-btn-cancel {
+  border: 1px solid var(--border-color);
+  background-color: transparent;
+  color: var(--text-secondary);
+}
+
+.modal-btn-cancel:hover {
+  background-color: var(--surface-hover); /* <-- FIXED */
+  color: var(--text-primary);
+}
+
+.modal-btn-create {
+  border: none;
+  /* --- FIXED --- */
+  background-color: var(--brand-primary); /* <- War --accent-color */
+  color: var(--brand-text-on-primary); /* <-- FIXED */
+}
+
+.modal-btn-create:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.modal-btn-create:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.modal-btn-delete {
+  border: none;
+  background-color: var(--brand-primary);
+  color: white;
+}
+
+.modal-btn-delete:hover {
+  background-color: var(--brand-primary-dark);
+  transform: translateY(-1px);
+}
+
+/* ===== ROOM DROPDOWN MENU ===== */
+.room-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  min-width: 180px;
+  animation: fadeIn 0.15s ease;
+  z-index: 99999;
+}
+
+.room-dropdown-item {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.15s ease;
+}
+
+.room-dropdown-item:hover {
+  background-color: var(--surface-hover);
+}
+
+.room-dropdown-delete {
+  color: #ef4444;
+}
+
+.room-dropdown-delete:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.room-dropdown-item svg {
+  flex-shrink: 0;
+}
+
+/* ===== FEATURE MODAL ===== */
+.feature-modal-content {
+  background-color: var(--background-light);
+  padding: 24px;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  animation: slideIn 0.2s ease;
+  text-align: center;
+}
+
+.feature-modal-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.feature-modal-content h3 {
+  margin: 0 0 12px 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.feature-modal-content p {
+  margin: 0 0 20px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.feature-modal-content .modal-actions {
+  justify-content: center;
+}
+
+.feature-modal-content .modal-btn {
+  min-width: 160px;
+}
+

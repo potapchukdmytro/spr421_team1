@@ -32,6 +32,7 @@ namespace web_chat.BLL.Services.RoomService
             return new ServiceResponse
             {
                 Message = "Room created successfully.",
+                Payload = room,
                 Data = room
             };
         }
@@ -95,6 +96,7 @@ namespace web_chat.BLL.Services.RoomService
             return new ServiceResponse
             {
                 Message = "Rooms successfully retrieved.",
+                Payload = roomDtos,
                 Data = roomDtos
             };
         }
@@ -113,6 +115,7 @@ namespace web_chat.BLL.Services.RoomService
             return new ServiceResponse
             {
                 Message = "Messages successfully retrieved.",
+                Payload = payload,
                 Data = payload
             };
         }

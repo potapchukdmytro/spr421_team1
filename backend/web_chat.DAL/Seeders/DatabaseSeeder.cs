@@ -22,6 +22,10 @@ namespace web_chat.DAL.Seeders
                 var roleSeeder = scope.ServiceProvider.GetRequiredService<RoleSeeder>();
                 await roleSeeder.SeedAsync();
 
+                // Seed default room
+                var defaultRoomSeeder = scope.ServiceProvider.GetRequiredService<DefaultRoomSeeder>();
+                await defaultRoomSeeder.SeedAsync();
+
                 Console.WriteLine("✅ Database seeding completed successfully");
             }
             catch (Exception ex)

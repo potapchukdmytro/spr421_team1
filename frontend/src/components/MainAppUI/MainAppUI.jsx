@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { authAPI, roomsAPI, messagesAPI } from '../../services/api'
+import { signalRService } from '../../services/signalr'
 import './MainAppUI.css'
 
 const MainAppUI = () => {
@@ -11,108 +13,22 @@ const MainAppUI = () => {
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [showNewRoomModal, setShowNewRoomModal] = useState(false)
+  const [newRoomName, setNewRoomName] = useState('')
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false)
+  const [showRoomMenu, setShowRoomMenu] = useState(false)
+  const [showRenameModal, setShowRenameModal] = useState(false)
+  const [renameRoomName, setRenameRoomName] = useState('')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [roomToDelete, setRoomToDelete] = useState(null)
+  const [showFeatureModal, setShowFeatureModal] = useState(false)
+  const [featureMessage, setFeatureMessage] = useState('')
   const messagesEndRef = useRef(null)
+  const currentUserRef = useRef(null)
+  const selectedRoomRef = useRef(null)
 
-  // Get current user from token or use demo user
-  useEffect(() => {
-    const user = authAPI.getCurrentUser()
-    if (user) {
-      setCurrentUser({
-        id: user.id,
-        name: user.userName || user.email?.split('@')[0] || 'User',
-        email: user.email,
-        avatar: (user.userName || user.email?.split('@')[0] || 'U').substring(0, 2).toUpperCase()
-      })
-    } else {
-      // Demo user for development
-      setCurrentUser({
-        id: 'demo-user',
-        name: 'Demo User',
-        email: 'demo@example.com',
-        avatar: 'DU'
-      })
-    }
-  }, [])
-
-  // Load rooms from API
-  const loadRooms = useCallback(async () => {
-    setLoading(true)
-    const result = await roomsAPI.getAll()
-    
-    if (result.success && result.data && result.data.length > 0) {
-      const formattedRooms = result.data.map(room => ({
-        id: room.id,
-        name: room.name,
-        avatar: room.name.substring(0, 2).toUpperCase(),
-        lastMessage: 'Click to load messages',
-        time: formatTime(room.createdAt),
-        unread: 0,
-        online: false,
-        isPrivate: room.isPrivate
-      }))
-      setRooms(formattedRooms)
-      if (formattedRooms.length > 0) {
-        setSelectedRoom(formattedRooms[0])
-      }
-    } else {
-      // No rooms found - show empty state
-      setRooms([])
-      setSelectedRoom(null)
-    }
-    setLoading(false)
-  }, [])
-
-  // Load messages for selected room
-  const loadMessages = useCallback(async (roomId) => {
-    setLoadingMessages(true)
-    const result = await messagesAPI.getByRoom(roomId)
-    
-    if (result.success && result.data) {
-      const formattedMessages = result.data.map(msg => ({
-        id: msg.id,
-        text: msg.text,
-        time: formatTime(msg.sentAt),
-        isMine: msg.userId === currentUser?.id,
-        sender: msg.user?.userName || 'User',
-        avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
-      }))
-      setMessages(formattedMessages)
-    } else {
-      // Fallback to mock messages
-      setMessages([
-        { id: 1, sender: 'Dmytro Potapchuk', avatar: 'DP', text: 'Hey! How are you?', time: '10:25', isMine: false },
-        { id: 2, sender: 'Me', text: 'Great! Just working on the chat UI', time: '10:26', isMine: true },
-        { id: 3, sender: 'Dmytro Potapchuk', avatar: 'DP', text: 'Awesome! Can\'t wait to see it', time: '10:28', isMine: false },
-        { id: 4, sender: 'Me', text: 'It\'s looking really good! Check it out soon 🚀', time: '10:30', isMine: true },
-      ])
-    }
-    setLoadingMessages(false)
-  }, [currentUser?.id])
-
-  // Send message
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedRoom) return
-
-    // Optimistic update
-    const tempMessage = {
-      id: Date.now(),
-      text: newMessage,
-      time: formatTime(new Date()),
-      isMine: true,
-      sender: currentUser?.name || 'Me'
-    }
-    setMessages(prev => [...prev, tempMessage])
-    setNewMessage('')
-
-    // Send to backend
-    const result = await messagesAPI.send(selectedRoom.id, newMessage)
-    if (result.success) {
-      loadMessages(selectedRoom.id) // Reload to get real message
-    }
-  }
-
-  // Format time helper
-  const formatTime = (date) => {
+  // Format time helper (defined early so it's available in closures)
+  const formatTime = useCallback((date) => {
     if (!date) return ''
     const d = new Date(date)
     const now = new Date()
@@ -127,6 +43,240 @@ const MainAppUI = () => {
       return d.toLocaleDateString('en-US', { weekday: 'long' })
     } else {
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }
+  }, [])
+
+  // Update selectedRoomRef when selectedRoom changes
+  useEffect(() => {
+    selectedRoomRef.current = selectedRoom
+    
+    // Re-register SignalR listener with fresh closure when room changes
+    if (signalRService.isConnected()) {
+      signalRService.onReceiveMessage((data) => {
+        console.log('📨 Received message via SignalR:', data)
+        console.log('📨 Current room:', selectedRoomRef.current?.id, 'Message room:', data.roomId)
+        console.log('📨 Current user:', currentUserRef.current?.name, 'Message from:', data.userName)
+        
+        // Only process if message is for the currently selected room
+        if (!selectedRoomRef.current || data.roomId !== selectedRoomRef.current.id) {
+          console.log('⏭️ Skipping message - different room')
+          return
+        }
+        
+        // Check if this is our own message (we already showed it optimistically)
+        const isOwnMessage = currentUserRef.current && data.userName === currentUserRef.current.name
+        
+        if (isOwnMessage) {
+          console.log('⏭️ Skipping own message (already shown optimistically)')
+          return
+        }
+        
+        // Add message from other users
+        console.log('✅ Adding message from other user')
+        setMessages(prev => {
+          const message = {
+            id: `msg-${Date.now()}-${Math.random()}`,
+            sender: data.userName || 'Unknown',
+            avatar: (data.userName || 'U').substring(0, 2).toUpperCase(),
+            text: data.message,
+            time: formatTime(new Date()),
+            isMine: false
+          }
+          return [...prev, message]
+        })
+      })
+    }
+  }, [selectedRoom, formatTime])
+
+  // Get current user from token
+  useEffect(() => {
+    const user = authAPI.getCurrentUser()
+    if (user) {
+      const userData = {
+        id: user.id,
+        name: user.userName || user.email?.split('@')[0] || 'User',
+        email: user.email,
+        avatar: (user.userName || user.email?.split('@')[0] || 'U').substring(0, 2).toUpperCase()
+      }
+      setCurrentUser(userData)
+      currentUserRef.current = userData
+    } else {
+      // Redirect to login if not authenticated
+      window.location.href = '/login'
+    }
+  }, [])
+
+  // Load rooms from API
+  const loadRooms = useCallback(async () => {
+    console.log('🔄 Loading rooms from API...')
+    setLoading(true)
+    const result = await roomsAPI.getAll()
+    console.log('📦 Rooms API result:', result)
+    console.log('📦 Rooms data:', result.data)
+    console.log('📦 Rooms data type:', typeof result.data, Array.isArray(result.data))
+    
+    if (result.success && result.data && result.data.length > 0) {
+      console.log('✅ Found', result.data.length, 'rooms')
+      const formattedRooms = result.data.map(room => ({
+        id: room.id,
+        name: room.name,
+        avatar: room.name.substring(0, 2).toUpperCase(), // pfp
+        lastMessage: 'Click to load messages',
+        time: formatTime(room.createdAt),
+        unread: 0,
+        online: false,
+        isPrivate: room.isPrivate
+      }))
+      setRooms(formattedRooms)
+      if (formattedRooms.length > 0) {
+        setSelectedRoom(formattedRooms[0])
+      }
+    } else {
+      console.log('⚠️ No rooms found or empty data')
+      // No rooms found - show empty state
+      setRooms([])
+      setSelectedRoom(null)
+    }
+    setLoading(false)
+  }, [])
+
+  // SignalR Connection
+  useEffect(() => {
+    const initSignalR = async () => {
+      if (!currentUser) return
+
+      const connected = await signalRService.connect()
+
+      if (connected) {
+        // Note: ReceiveMessage listener is registered in selectedRoom useEffect
+        // to ensure fresh closure with current room state
+        
+        // Listen for room created events
+        signalRService.onRoomCreated(() => {
+          loadRooms() // Reload rooms list
+        })
+
+        // Listen for user joined events
+        signalRService.onUserJoined(() => {
+          // Optionally show a notification
+        })
+
+        // Listen for user left events
+        signalRService.onUserLeft(() => {
+          // Optionally show a notification
+        })
+
+        // Listen for room deleted events
+        signalRService.onRoomDeleted((roomId) => {
+          loadRooms() // Reload rooms list
+          if (selectedRoomRef.current?.id === roomId) {
+            setSelectedRoom(null)
+            setMessages([])
+          }
+        })
+      }
+    }
+
+    initSignalR()
+
+    // Cleanup on unmount
+    return () => {
+      signalRService.disconnect()
+    }
+  }, [currentUser])
+
+  // Load messages for selected room
+  const loadMessages = useCallback(async (roomId) => { // optimized, function will not recreate on each render
+    console.log('📥 Loading messages for room:', roomId)
+    setLoadingMessages(true)
+    const result = await messagesAPI.getByRoom(roomId)
+    console.log('📥 Messages API result:', result)
+    console.log('📥 Messages data:', result.data)
+    
+    if (result.success && result.data && result.data.length > 0) {
+      const formattedMessages = result.data.map(msg => ({
+        id: msg.id,
+        text: msg.text,
+        time: formatTime(msg.sentAt),
+        isMine: msg.userId === currentUser?.id,
+        sender: msg.user?.userName || 'User',
+        avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+      }))
+      console.log('📥 Formatted messages:', formattedMessages)
+      setMessages(formattedMessages)
+    } else {
+      // Check if this is the official room and show welcome message
+      const currentRoom = rooms.find(r => r.id === roomId)
+      if (currentRoom && (currentRoom.name === 'Web Chat Official' || currentRoom.name === 'Official Web Chat')) {
+        setMessages([
+          { 
+            id: 'welcome-1', 
+            sender: 'Web Chat', 
+            avatar: 'WC', 
+            text: '🎉 Welcome to Web Chat Official!', 
+            time: '', 
+            isMine: false,
+            isSystem: true
+          },
+          { 
+            id: 'welcome-2', 
+            sender: 'Web Chat', 
+            avatar: 'WC', 
+            text: '🚀 Made by the best developers in the whole world!\n\n👨‍💻 Team:\n• Kyuuto09\n• axneo27\n• SlavaMokrynskyi\n• da2045\n• samoliukrustam123', 
+            time: '', 
+            isMine: false,
+            isSystem: true
+          },
+          { 
+            id: 'welcome-3', 
+            sender: 'Web Chat', 
+            avatar: 'WC', 
+            text: '✨ This is a real-time chat application powered by SignalR and React. Enjoy chatting!', 
+            time: '', 
+            isMine: false,
+            isSystem: true
+          }
+        ])
+      } else {
+        setMessages([])
+      }
+    }
+    setLoadingMessages(false)
+  }, [currentUser?.id, rooms, formatTime])
+
+  // Send message
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedRoom) return
+
+    const messageText = newMessage
+    setNewMessage('') // Clear input immediately
+
+    // Add message optimistically to UI immediately
+    const optimisticMessage = {
+      id: `temp-${Date.now()}-${Math.random()}`,
+      text: messageText,
+      time: formatTime(new Date()),
+      isMine: true,
+      sender: currentUser?.name || 'Me',
+      avatar: (currentUser?.name || 'ME').substring(0, 2).toUpperCase()
+    }
+    setMessages(prev => [...prev, optimisticMessage])
+
+    // Send via SignalR
+    const sentViaSignalR = await signalRService.sendMessage(messageText, selectedRoom.id)
+
+    if (!sentViaSignalR) {
+      // Fallback to REST API
+      console.log('⚠️ SignalR failed, using REST API fallback')
+      
+      const result = await messagesAPI.send(selectedRoom.id, messageText)
+      if (result.success) {
+        loadMessages(selectedRoom.id) // Reload to get real message
+      } else {
+        // Remove optimistic message if failed
+        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+        alert('Failed to send message')
+      }
     }
   }
 
@@ -149,19 +299,225 @@ const MainAppUI = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Close room menu on click outside
+  useEffect(() => {
+    const handleClick = () => setShowRoomMenu(false)
+    if (showRoomMenu) {
+      document.addEventListener('click', handleClick)
+      return () => document.removeEventListener('click', handleClick)
+    }
+  }, [showRoomMenu])
+
   const handleLogout = () => {
     authAPI.logout()
     window.location.href = '/'
   }
 
+  // Handle deleting a room
+  const handleDeleteRoom = async () => {
+    if (!roomToDelete) return
+
+    const roomId = roomToDelete.id
+
+    try {
+      const result = await roomsAPI.delete(roomId)
+      console.log('🗑️ Room deletion result:', result)
+      
+      if (result.success) {
+        console.log('✅ Room deleted successfully')
+        // Close modal
+        setShowDeleteModal(false)
+        setRoomToDelete(null)
+        
+        // If deleted room was selected, clear selection
+        if (selectedRoom?.id === roomId) {
+          setSelectedRoom(null)
+          setMessages([])
+        }
+        await loadRooms() // Reload rooms list
+      } else {
+        alert('Failed to delete room: ' + (result.error || result.message || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('💥 Exception deleting room:', error)
+      alert('Error deleting room: ' + error.message)
+    }
+  }
+
+  // Handle renaming a room
+  const handleRenameRoom = async () => {
+    if (!renameRoomName.trim() || !selectedRoom) return
+
+    try {
+      const result = await roomsAPI.update(selectedRoom.id, renameRoomName.trim())
+      console.log('✏️ Room rename result:', result)
+      
+      if (result.success) {
+        console.log('✅ Room renamed successfully')
+        setRenameRoomName('')
+        setShowRenameModal(false)
+        await loadRooms() // Reload rooms list
+      } else {
+        alert('Failed to rename room: ' + (result.error || result.message || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('💥 Exception renaming room:', error)
+      alert('Error renaming room: ' + error.message)
+    }
+  }
+
+  // Handle creating new room
+  const handleCreateRoom = async () => {
+    if (!newRoomName.trim() || isCreatingRoom) return
+
+    console.log('📝 Creating room:', newRoomName.trim())
+    setIsCreatingRoom(true)
+    
+    try {
+      const result = await roomsAPI.create(newRoomName.trim(), false) // Create public room
+      console.log('📦 Room creation result:', result)
+      
+      if (result.success) {
+        console.log('✅ Room created successfully')
+        setNewRoomName('')
+        setShowNewRoomModal(false)
+        
+        // Force reload rooms after a short delay to ensure backend has committed
+        setTimeout(async () => {
+          console.log('🔄 Reloading rooms after creation...')
+          await loadRooms()
+        }, 500)
+      } else {
+        console.error('❌ Failed to create room:', result.error)
+        alert('Failed to create room: ' + (result.error || result.message || 'Unknown error'))
+      }
+    } catch (error) {
+      console.error('💥 Exception creating room:', error)
+      alert('Error creating room: ' + error.message)
+    } finally {
+      setIsCreatingRoom(false)
+    }
+  }
+
   return (
     <div className="app-layout">
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && roomToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '400px' }}>
+            <h3 style={{ color: 'var(--brand-primary)', marginBottom: '16px' }}>Delete Room?</h3>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.6' }}>
+              Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>\u201c{roomToDelete.name}\u201d</strong>? 
+              This action cannot be undone and all messages will be permanently deleted.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="modal-btn modal-btn-cancel"
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setRoomToDelete(null)
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn modal-btn-delete"
+                onClick={handleDeleteRoom}
+              >
+                Delete Room
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename Room Modal */}
+      {showRenameModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Rename Room</h3>
+            <input
+              type="text"
+              className="modal-input"
+              placeholder="Enter new room name..."
+              value={renameRoomName}
+              onChange={(e) => setRenameRoomName(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') handleRenameRoom()
+              }}
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button
+                className="modal-btn modal-btn-cancel"
+                onClick={() => {
+                  setShowRenameModal(false)
+                  setRenameRoomName('')
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn modal-btn-create"
+                onClick={handleRenameRoom}
+                disabled={!renameRoomName.trim()}
+              >
+                Rename
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Room Modal */}
+      {showNewRoomModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Create New Room</h3>
+            <input
+              type="text"
+              className="modal-input"
+              placeholder="Enter room name..."
+              value={newRoomName}
+              onChange={(e) => setNewRoomName(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') handleCreateRoom()
+              }}
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button
+                className="modal-btn modal-btn-cancel"
+                onClick={() => {
+                  setShowNewRoomModal(false)
+                  setNewRoomName('')
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-btn modal-btn-create"
+                onClick={handleCreateRoom}
+                disabled={!newRoomName.trim() || isCreatingRoom}
+              >
+                {isCreatingRoom ? 'Creating...' : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Left Sidebar */}
       <div className="sidebar">
         <div className="sidebar-header">
-          <h2>Web Chat</h2>
-          <button className="new-chat-btn" title="New Chat">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <h2>Web Chat TEST</h2>
+          <button 
+            className="new-chat-btn" 
+            title="New Chat"
+            type="button"
+            onClick={() => setShowNewRoomModal(true)}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ pointerEvents: 'none' }}>
               <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
@@ -186,7 +542,18 @@ const MainAppUI = () => {
               <div 
                 key={room.id}
                 className={`chat-item ${selectedRoom?.id === room.id ? 'active' : ''}`}
-                onClick={() => setSelectedRoom(room)}
+                onClick={async () => {
+                  setSelectedRoom(room)
+                  
+                  // Join the room via SignalR first
+                  if (signalRService.isConnected()) {
+                    await signalRService.joinRoom(room.id)
+                    console.log('🚪 Joined SignalR room:', room.id)
+                  }
+                  
+                  // Then load messages for this room
+                  await loadMessages(room.id)
+                }}
               >
                 <div className="chat-avatar">
                   {room.avatar}
@@ -211,7 +578,7 @@ const MainAppUI = () => {
           <div className="user-profile" onClick={() => setIsProfileOpen(!isProfileOpen)}>
             <div className="user-avatar">{currentUser?.avatar || 'DU'}</div>
             <div className="user-info">
-              <span className="user-name">{currentUser?.name || 'Demo User'}</span>
+              <span className="user-name">{currentUser?.name || 'User'}</span>
               <span className="user-status">Online</span>
             </div>
             <svg className={`chevron-icon ${isProfileOpen ? 'open' : ''}`} width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -221,20 +588,20 @@ const MainAppUI = () => {
 
           {isProfileOpen && (
             <div className="profile-dropdown">
-              <button className="dropdown-item">
+              <Link to="/profile" className="dropdown-item">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M3 13C3 10.2386 5.23858 8 8 8C10.7614 8 13 10.2386 13 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
                 Profile
-              </button>
-              <button className="dropdown-item">
+              </Link>
+              <Link to="/profile" className="dropdown-item">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
                   <path d="M8 5V8L10 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
                 Settings
-              </button>
+              </Link>
               <div className="dropdown-divider"></div>
               <button className="dropdown-item logout" onClick={handleLogout}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -258,23 +625,65 @@ const MainAppUI = () => {
                   <h3>{selectedRoom.name}</h3>
                   <span className="online-status">{selectedRoom.online ? 'Online' : 'Offline'}</span>
                 </div>
-          </div>
-          <div className="chat-header-actions">
-            <button className="header-btn" title="Search">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M12 12L16 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-            <button className="header-btn" title="More">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <circle cx="9" cy="4" r="1" fill="currentColor"/>
-                <circle cx="9" cy="9" r="1" fill="currentColor"/>
-                <circle cx="9" cy="14" r="1" fill="currentColor"/>
-              </svg>
-            </button>
-          </div>
-        </div>
+              </div>
+              <div className="chat-header-actions">
+                <button className="header-btn" title="Search">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M12 12L16 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+                <div style={{ position: 'relative' }}>
+                  <button 
+                    className="header-btn" 
+                    title="More"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowRoomMenu(!showRoomMenu)
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                      <circle cx="9" cy="4" r="1" fill="currentColor"/>
+                      <circle cx="9" cy="9" r="1" fill="currentColor"/>
+                      <circle cx="9" cy="14" r="1" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  {showRoomMenu && (
+                    <div className="room-dropdown-menu">
+                      <button
+                        className="room-dropdown-item"
+                        onClick={() => {
+                          setRenameRoomName(selectedRoom.name)
+                          setShowRenameModal(true)
+                          setShowRoomMenu(false)
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M11.333 2A1.886 1.886 0 0114 4.667l-9 9-3.667 1 1-3.667 9-9z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Rename Room
+                      </button>
+                      <button
+                        className="room-dropdown-item room-dropdown-delete"
+                        onClick={() => {
+                          setRoomToDelete({
+                            id: selectedRoom.id,
+                            name: selectedRoom.name
+                          })
+                          setShowDeleteModal(true)
+                          setShowRoomMenu(false)
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 011.334-1.334h2.666a1.333 1.333 0 011.334 1.334V4m2 0v9.333a1.333 1.333 0 01-1.334 1.334H4.667a1.333 1.333 0 01-1.334-1.334V4h9.334z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        Delete Room
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div className="message-list">
               {loadingMessages ? (
@@ -307,7 +716,14 @@ const MainAppUI = () => {
             </div>
 
             <div className="message-input-area">
-              <button className="input-btn" title="Attach file">
+              <button 
+                className="input-btn" 
+                title="Attach file"
+                onClick={() => {
+                  setFeatureMessage('📎 File Attachment')
+                  setShowFeatureModal(true)
+                }}
+              >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <path d="M10 15V6M10 6L7 9M10 6L13 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -325,7 +741,14 @@ const MainAppUI = () => {
                   }
                 }}
               />
-              <button className="input-btn" title="Emoji">
+              <button 
+                className="input-btn" 
+                title="Emoji"
+                onClick={() => {
+                  setFeatureMessage('😊 Emoji Picker')
+                  setShowFeatureModal(true)
+                }}
+              >
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                   <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.5"/>
                   <circle cx="7.5" cy="8.5" r="1" fill="currentColor"/>
@@ -352,6 +775,25 @@ const MainAppUI = () => {
           </div>
         )}
       </div>
+
+      {/* Feature Under Development Modal */}
+      {showFeatureModal && (
+        <div className="modal-overlay" onClick={() => setShowFeatureModal(false)}>
+          <div className="feature-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="feature-modal-icon">🚧</div>
+            <h3>{featureMessage}</h3>
+            <p>This feature is currently under development and will be available soon. Stay tuned for updates!</p>
+            <div className="modal-actions">
+              <button 
+                className="modal-btn modal-btn-create" 
+                onClick={() => setShowFeatureModal(false)}
+              >
+                Got it!
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
