@@ -30,7 +30,8 @@ namespace web_chat.Hubs
             // Можливо потім: змінювати статус користувача на "онлайн - true"
 
             var response = await _userRoomService.GetUserRoomsAsync(userId);
-            var userRooms = response.Data as List<string> ?? new List<string>();
+            var userRoomDtos = response.Data as List<web_chat.BLL.Dtos.Room.RoomDto> ?? new List<web_chat.BLL.Dtos.Room.RoomDto>();
+            var userRooms = userRoomDtos.Select(r => r.Id).ToList();
 
             foreach (var roomId in userRooms) // Під'єднуємо користувача до його кімнат
             {
@@ -86,7 +87,8 @@ namespace web_chat.Hubs
                     userName = userName,
                     message = message,
                     sentAt = savedMessage?.SentAt,
-                    userId = userId
+                    userId = userId,
+                    roomId = roomId
                 });
             }
             else

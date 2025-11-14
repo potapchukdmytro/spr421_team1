@@ -132,7 +132,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("dev");
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection(); // Disabled for development to allow HTTP requests
 
 app.UseAuthentication();
 app.UseAuthorization();
