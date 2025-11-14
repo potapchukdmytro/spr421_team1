@@ -17,12 +17,6 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
-// DbContext
-builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    options.UseNpgsql(builder.Configuration.GetConnectionString("axneo_db"));
-});
-
 // Identity
 builder.Services
     .AddIdentity<UserEntity, ApplicationRole>(options =>
@@ -61,13 +55,37 @@ builder.Services
             IssuerSigningKey = key,
             ClockSkew = TimeSpan.Zero
         };
+
+        // Allow SignalR to get JWT token from query string
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 
 // Custom services
 builder.Services.AddScoped<IAuthService, AuthService>();
 
+// Room management services
+builder.Services.AddScoped<web_chat.BLL.Services.RoomService.IRoomService, web_chat.BLL.Services.RoomService.RoomService>();
+builder.Services.AddScoped<web_chat.DAL.Repositories.RoomRepository.IRoomRepository, web_chat.DAL.Repositories.RoomRepository.RoomRepository>();
+builder.Services.AddScoped<web_chat.BLL.Services.UserRoomService.IUserRoomService, web_chat.BLL.Services.UserRoomService.UserRoomService>();
+builder.Services.AddScoped<web_chat.DAL.Repositories.RoomRepository.IUserRoomRepository, web_chat.DAL.Repositories.UserRoomRepository.UserRoomRepository>();
+
 // Add database seeders
 builder.Services.AddDatabaseSeeders();
+
+// SignalR
+builder.Services.AddSignalR();
 
 // CORS
 builder.Services.AddCors(options =>
@@ -84,7 +102,7 @@ builder.Services.AddCors(options =>
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 
 
-// DbContext
+// DbContext - THIS IS THE CORRECT, SINGLE ENTRY
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultDb"));
@@ -110,19 +128,20 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<web_chat.Hubs.ChatHub>("/hubs/chat");
 
 // Apply pending migrations and seed database
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     
-    // Apply migrations (this will create proper Identity schema)
+    // Apply migrations (proper Identity schema)
     if (db.Database.GetPendingMigrations().Any())
     {
         db.Database.Migrate();
     }
     
-    // Seed roles FIRST (required for user registration)
+    // Seed roles FIRST (required for user registration) 
     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
     await seeder.SeedAllAsync();
     

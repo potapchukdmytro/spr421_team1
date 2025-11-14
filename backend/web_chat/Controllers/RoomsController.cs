@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using web_chat.DAL;
+using web_chat.BLL.Dtos.Room;
+using web_chat.BLL.Services.RoomService;
 
 namespace web_chat.Controllers
 {
@@ -8,48 +8,55 @@ namespace web_chat.Controllers
     [Route("api/rooms")]
     public class RoomsController : ControllerBase
     {
-        private readonly AppDbContext _context;
+        private readonly IRoomService _roomService;
 
-        public RoomsController(AppDbContext context)
+        public RoomsController(IRoomService roomService)
         {
-            _context = context;
+            _roomService = roomService;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAllRooms()
         {
-            var rooms = await _context.Rooms
-                .Select(r => new
-                {
-                    r.Id,
-                    r.Name,
-                    r.IsPrivate,
-                    CreatedAt = r.CreatedDate
-                })
-                .ToListAsync();
-
-            return Ok(rooms);
+            var response = await _roomService.GetAllRoomsAsync();
+            return Ok(response);
         }
 
-        [HttpGet("{id}/messages")]
-        public async Task<IActionResult> GetRoomMessages(string id)
+        [HttpGet("messages")]
+        public async Task<IActionResult> GetRoomMessages([FromQuery] string roomId, [FromQuery] string userId) // userId - для перевірки чи є повідомлення користувача
         {
-            var messages = await _context.Messages
-                .Where(m => m.RoomId == id)
-                .Include(m => m.User)
-                .OrderBy(m => m.SentAt)
-                .Select(m => new
-                {
-                    m.Id,
-                    m.Text,
-                    m.SentAt,
-                    m.UserId,
-                    UserName = m.User != null ? m.User.UserName : "Unknown",
-                    IsMine = false // user authentication check later... 
-                })
-                .ToListAsync();
-
-            return Ok(messages);
+            var response = await _roomService.GetRoomMessagesAsync(roomId,userId);
+            return Ok(response);
+        }
+        [HttpPut]
+        public async Task<IActionResult> UpdateRoom([FromBody] UpdateRoomDto dto)
+        {
+            var response = await _roomService.UpdateRoomAsync(dto);
+            return Ok(response);
+        }
+        [HttpDelete]
+        public async Task<IActionResult> DeleteRoom([FromQuery] string roomId)
+        {
+            var response = await _roomService.DeleteRoomAsync(roomId);
+            return Ok(response);
+        }
+        [HttpPost]
+        public async Task<IActionResult> CreateRoom([FromBody] CreateRoomDto dto)
+        {
+            var response = await _roomService.CreateRoomAsync(dto);
+            return Ok(response);
+        }
+        [HttpGet("by-id")]
+        public async Task<IActionResult> GetRoomById([FromQuery] string roomId)
+        {
+            var response = await _roomService.GetRoomByIdAsync(roomId);
+            return Ok(response);
+        }
+        [HttpGet("by-name")]
+        public async Task<IActionResult> GetRoomByName([FromQuery] string roomName)
+        {
+            var response = await _roomService.GetRoomByNameAsync(roomName);
+            return Ok(response);
         }
     }
 }
