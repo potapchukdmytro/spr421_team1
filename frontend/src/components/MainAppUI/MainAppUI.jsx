@@ -26,6 +26,7 @@ const MainAppUI = () => {
   const messagesEndRef = useRef(null)
   const currentUserRef = useRef(null)
   const selectedRoomRef = useRef(null)
+  const messageSignaturesRef = useRef(new Set()) // Track message signatures to prevent duplicates
 
   // Format time helper (defined early so it's available in closures)
   const formatTime = useCallback((date) => {
@@ -114,27 +115,19 @@ const MainAppUI = () => {
       if (connected) {
         // Set up persistent message listener that works for all rooms
         signalRService.onReceiveMessage((data) => {
-          console.log('📨 RECEIVED MESSAGE via SignalR:', data)
-          console.log('📨 Current room:', selectedRoomRef.current?.id, 'Message room:', data.roomId)
-          console.log('📨 Current user:', currentUserRef.current?.name, 'Message from:', data.userName)
-          console.log('📨 Connection state:', signalRService.isConnected())
-
           // Only process if message is for the currently selected room
           if (!selectedRoomRef.current || data.roomId !== selectedRoomRef.current.id) {
-            console.log('⏭️ Skipping message - different room or no room selected')
             return
           }
           
-          // Check if this is our own message (we already showed it optimistically)
-          const isOwnMessage = currentUserRef.current && data.userName === currentUserRef.current.name
-          
-          if (isOwnMessage) {
-            console.log('⏭️ Skipping own message (already shown optimistically)')
+          // Check if we've already seen this message
+          const messageSignature = `${data.userName.toLowerCase().trim()}:${data.message.trim()}`
+          if (messageSignaturesRef.current.has(messageSignature)) {
             return
           }
           
-          // Add message from other users
-          console.log('✅ Adding message from other user to UI')
+          // Add message to UI
+          messageSignaturesRef.current.add(messageSignature)
           setMessages(prev => {
             const message = {
               id: `msg-${Date.now()}-${Math.random()}`,
@@ -205,6 +198,14 @@ const MainAppUI = () => {
         avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
       }))
       console.log('📥 Formatted messages:', formattedMessages)
+      
+      // Clear and repopulate signatures for this room
+      messageSignaturesRef.current.clear()
+      formattedMessages.forEach(msg => {
+        const messageSignature = `${msg.sender.toLowerCase().trim()}:${msg.text.trim()}`
+        messageSignaturesRef.current.add(messageSignature)
+      })
+      
       setMessages(formattedMessages)
     } else {
       // Check if this is the official room and show welcome message
@@ -254,6 +255,7 @@ const MainAppUI = () => {
     setNewMessage('') // Clear input immediately
 
     // Add message optimistically to UI immediately
+    const messageSignature = `${(currentUser?.name || 'Me').toLowerCase().trim()}:${messageText.trim()}`
     const optimisticMessage = {
       id: `temp-${Date.now()}-${Math.random()}`,
       text: messageText,
@@ -262,7 +264,12 @@ const MainAppUI = () => {
       sender: currentUser?.name || 'Me',
       avatar: (currentUser?.name || 'ME').substring(0, 2).toUpperCase()
     }
-    setMessages(prev => [...prev, optimisticMessage])
+    
+    // Only add if we haven't seen this message before
+    if (!messageSignaturesRef.current.has(messageSignature)) {
+      messageSignaturesRef.current.add(messageSignature)
+      setMessages(prev => [...prev, optimisticMessage])
+    }
 
     // Send via SignalR
     const sentViaSignalR = await signalRService.sendMessage(messageText, selectedRoom.id)
@@ -292,6 +299,8 @@ const MainAppUI = () => {
   // Load messages when room changes
   useEffect(() => {
     if (selectedRoom) {
+      // Clear signatures when switching rooms
+      messageSignaturesRef.current.clear()
       loadMessages(selectedRoom.id)
     }
   }, [selectedRoom, loadMessages])
@@ -304,24 +313,36 @@ const MainAppUI = () => {
       try {
         const result = await messagesAPI.getByRoom(selectedRoom.id)
         if (result.success && result.data && result.data.length > 0) {
-          const currentMessageIds = new Set(messages.map(m => m.id))
-          
-          // Find messages that we don't have yet
-          const newMessages = result.data.filter(msg => !currentMessageIds.has(msg.id))
-          
-          if (newMessages.length > 0) {
-            console.log('📊 Polling found', newMessages.length, 'new messages')
-            // Format and append the new messages
-            const formattedMessages = newMessages.map(msg => ({
-              id: msg.id,
-              text: msg.text,
-              time: formatTime(msg.sentAt),
-              isMine: msg.userId === currentUser?.id,
-              sender: msg.user?.userName || 'User',
-              avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
-            }))
-            setMessages(prev => [...prev, ...formattedMessages])
-          }
+          setMessages(prev => {
+            const newMessages = []
+            const existingSignatures = new Set(messageSignaturesRef.current)
+            
+            result.data.forEach(msg => {
+              const messageSignature = `${(msg.user?.userName || 'User').toLowerCase().trim()}:${msg.text.trim()}`
+              
+              // Skip if we've already seen this message
+              if (existingSignatures.has(messageSignature)) {
+                return
+              }
+              
+              // Add new message
+              messageSignaturesRef.current.add(messageSignature)
+              newMessages.push({
+                id: msg.id,
+                text: msg.text,
+                time: formatTime(msg.sentAt),
+                isMine: msg.userId === currentUser?.id,
+                sender: msg.user?.userName || 'User',
+                avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
+              })
+            })
+            
+            if (newMessages.length > 0) {
+              console.log('📊 Polling found', newMessages.length, 'new messages')
+              return [...prev, ...newMessages]
+            }
+            return prev
+          })
         }
       } catch (error) {
         console.error('❌ Polling error:', error)
