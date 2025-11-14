@@ -18,6 +18,7 @@ using web_chat.DAL.Repositories.MessageRepository;
 using web_chat.BLL.Services.RoomService;
 using web_chat.BLL.Services.UserRoomService;
 using web_chat.BLL.Services.MessageService;
+using web_chat.BLL.Services.UserService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -94,6 +95,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IRoomService, RoomService>();
 builder.Services.AddScoped<IUserRoomService, UserRoomService>();
 builder.Services.AddScoped<IMessageService, MessageService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddDatabaseSeeders();
 
