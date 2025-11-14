@@ -36,6 +36,7 @@ namespace web_chat.DAL.Seeders
                 Id = Guid.NewGuid().ToString(),
                 Name = "Dmytro Potapchuk",
                 IsPrivate = true,
+                CreatedById = testUser.Id,
                 CreatedDate = DateTime.UtcNow
             };
             _context.Rooms.Add(testRoom);

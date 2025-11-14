@@ -153,19 +153,29 @@ namespace web_chat.Hubs
         }
         public async Task CreateRoom(string roomName, bool isPrivate, List<string> userIds)
         {
+            var userId = GetUserId();
             var response = await _roomService.CreateRoomAsync(new CreateRoomDto
             {
                 Name = roomName,
-                IsPrivate = isPrivate
+                IsPrivate = isPrivate,
+                CreatedById = userId
             });
             var room = response.Data as RoomDto ?? new RoomDto();
             await Groups.AddToGroupAsync(Context.ConnectionId, room.Id);
 
-            foreach (var userId in userIds)
+            // Add the creator to the room first
+            await _userRoomService.JoinRoomAsync(new CreateRoomMemberDto
+            {
+                UserId = userId,
+                RoomId = room.Id
+            });
+
+            // Then add the invited users
+            foreach (var memberUserId in userIds)
             {
                 await _userRoomService.JoinRoomAsync(new CreateRoomMemberDto
                 {
-                    UserId = userId,
+                    UserId = memberUserId,
                     RoomId = room.Id
                 });
             }
@@ -217,19 +227,38 @@ namespace web_chat.Hubs
             await Clients.Group(roomId).SendAsync("RoomDeleted", roomId);
         }
 
-        public async Task GetRoomMessages(string roomId)
+        public async Task AddUserToRoom(string userId, string roomId)
         {
-            var userId = GetUserId();
-            var response = await _messageService.GetRoomMessagesAsync(roomId, userId);
+            // Check if the current user has permission to add users to this room
+            var currentUserId = GetUserId();
             
-            if (response.IsSuccess)
+            // Verify the room exists and current user is the creator or admin
+            var roomResponse = await _roomService.GetRoomByIdAsync(roomId);
+            if (!roomResponse.IsSuccess || roomResponse.Data == null)
             {
-                await Clients.Caller.SendAsync("RoomMessages", new { roomId, messages = response.Data });
+                await Clients.Caller.SendAsync("AddUserError", new { error = "Room not found" });
+                return;
             }
-            else
+            
+            var room = roomResponse.Data as RoomDto;
+            if (room == null || room.CreatedById != currentUserId)
             {
-                await Clients.Caller.SendAsync("MessageError", new { error = response.Message });
+                await Clients.Caller.SendAsync("AddUserError", new { error = "Only room creator can add users" });
+                return;
             }
+
+            // Add the user to the room
+            await _userRoomService.JoinRoomAsync(new CreateRoomMemberDto
+            {
+                UserId = userId,
+                RoomId = roomId
+            });
+
+            // Notify the added user to refresh their rooms list
+            // Send to all clients - the frontend will filter by user ID
+            await Clients.All.SendAsync("RoomAdded", new { userId, roomId, roomName = room.Name });
+
+            await Clients.Caller.SendAsync("UserAddedToRoom", new { userId, roomId, roomName = room.Name });
         }
 
         private string GetUserId()

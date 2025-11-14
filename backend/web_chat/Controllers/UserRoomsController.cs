@@ -19,6 +19,13 @@ namespace web_chat.Controllers
             var response = await _userRoomService.GetUserRoomsAsync(userId);
             return Ok(response);
         }
+
+        [HttpGet("user-room-id")]
+        public async Task<IActionResult> GetUserRoomId([FromQuery] string userId, [FromQuery] string roomId)
+        {
+            var response = await _userRoomService.GetUserRoomIdAsync(userId, roomId);
+            return Ok(response);
+        }
         [HttpGet]
         public async Task<IActionResult> GetAllUserRooms()
         {

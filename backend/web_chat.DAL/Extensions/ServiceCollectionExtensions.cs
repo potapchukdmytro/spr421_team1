@@ -8,7 +8,6 @@ namespace web_chat.DAL.Extensions
         public static IServiceCollection AddDatabaseSeeders(this IServiceCollection services)
         {
             services.AddScoped<RoleSeeder>();
-            services.AddScoped<TestDataSeeder>();
             services.AddScoped<DatabaseSeeder>();
             
             return services;

@@ -7,5 +7,7 @@ namespace web_chat.BLL.Dtos.Room
         [Required(ErrorMessage = "Ім'я кімнати є обов'язковим")]
         public string? Name { get; set; }
         public bool IsPrivate { get; set; } = false;
+        [Required(ErrorMessage = "ID творця є обов'язковим")]
+        public string? CreatedById { get; set; }
     }
 }

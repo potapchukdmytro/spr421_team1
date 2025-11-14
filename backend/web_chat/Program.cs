@@ -104,7 +104,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("dev", policy =>
     {
-        policy.WithOrigins("http://localhost:3000", "http://localhost:5173", "http://localhost:5174")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "http://localhost:5174")
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials();
@@ -130,9 +130,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-
 app.UseCors("dev");
+
+app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -155,10 +155,6 @@ using (var scope = app.Services.CreateScope())
     // Спочатку ініціалізувати ролі (потрібно для реєстрації користувачів)
     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
     await seeder.SeedAllAsync();
-    
-    // Засіяти тестові дані (приклад кімнати та повідомлень)
-    var testSeeder = scope.ServiceProvider.GetRequiredService<TestDataSeeder>();
-    await testSeeder.SeedAsync();
 }
 
 app.Run();

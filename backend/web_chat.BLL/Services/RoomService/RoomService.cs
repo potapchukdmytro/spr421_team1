@@ -27,16 +27,39 @@ namespace web_chat.BLL.Services.RoomService
                     StatusCode = System.Net.HttpStatusCode.BadRequest
                 };
             }
+            if(string.IsNullOrWhiteSpace(dto.CreatedById))
+            {
+                return new ServiceResponse
+                {
+                    Message = "CreatedById cannot be null or empty.",
+                    StatusCode = System.Net.HttpStatusCode.BadRequest
+                };
+            }
             var room = new RoomEntity { 
                 Id = Guid.NewGuid().ToString(),
                 Name = dto.Name,
-                IsPrivate = dto.IsPrivate
+                IsPrivate = dto.IsPrivate,
+                CreatedById = dto.CreatedById
             };
             await _roomRepository.CreateAsync(room);
+            
+            // Load the room with CreatedBy navigation property
+            var createdRoom = await _roomRepository.GetAll()
+                .Include(r => r.CreatedBy)
+                .FirstOrDefaultAsync(r => r.Id == room.Id);
+                
+            var roomDto = new RoomDto
+            {
+                Id = createdRoom!.Id,
+                Name = createdRoom.Name,
+                IsPrivate = createdRoom.IsPrivate,
+                CreatedById = createdRoom.CreatedById,
+                CreatedByName = createdRoom.CreatedBy?.UserName ?? "Unknown"
+            };
             return new ServiceResponse
             {
                 Message = "Room created successfully.",
-                Data = room
+                Data = roomDto
             };
         }
         public async Task<ServiceResponse> UpdateRoomAsync(UpdateRoomDto dto)
@@ -81,6 +104,7 @@ namespace web_chat.BLL.Services.RoomService
         public async Task<ServiceResponse> GetAllRoomsAsync()
         {
             var rooms= await _roomRepository.Rooms
+                .Include(r => r.CreatedBy)
                 .OrderBy(r => r.Name)
                 .ToListAsync();
 
@@ -92,7 +116,9 @@ namespace web_chat.BLL.Services.RoomService
                 { 
                     Id = room.Id,
                     Name = room.Name,
-                    IsPrivate = room.IsPrivate
+                    IsPrivate = room.IsPrivate,
+                    CreatedById = room.CreatedById,
+                    CreatedByName = room.CreatedBy?.UserName ?? "Unknown"
                 };
                 roomDtos.Add(dto);
             }

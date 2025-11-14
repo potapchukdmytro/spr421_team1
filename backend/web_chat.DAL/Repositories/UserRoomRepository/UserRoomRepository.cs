@@ -26,6 +26,15 @@ namespace web_chat.DAL.Repositories.UserRoomRepository
                 .Select(ur => ur.RoomId)
                 .ToListAsync();
         }
+        public async Task<List<RoomEntity>> GetUserRoomObjectsAsync(string userId)
+        {
+            return await UserRooms
+                .Where(ur => ur.UserId == userId)
+                .Include(ur => ur.Room)
+                .ThenInclude(r => r.CreatedBy)
+                .Select(ur => ur.Room)
+                .ToListAsync();
+        }
         public async Task<bool> IsMemberAsync(UserRoomEntity entity)
         {
             return await UserRooms
