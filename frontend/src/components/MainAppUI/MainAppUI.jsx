@@ -26,6 +26,8 @@ const MainAppUI = () => {
   const messagesEndRef = useRef(null)
   const currentUserRef = useRef(null)
   const selectedRoomRef = useRef(null)
+  const processedMessageIdsRef = useRef(new Set()) // Track actual message IDs from server
+  const optimisticMessagesRef = useRef(new Map()) // Track optimistic messages: text -> timestamp
 
   // Format time helper (defined early so it's available in closures)
   const formatTime = useCallback((date) => {
@@ -49,44 +51,7 @@ const MainAppUI = () => {
   // Update selectedRoomRef when selectedRoom changes
   useEffect(() => {
     selectedRoomRef.current = selectedRoom
-    
-    // Re-register SignalR listener with fresh closure when room changes
-    if (signalRService.isConnected()) {
-      signalRService.onReceiveMessage((data) => {
-        console.log('📨 Received message via SignalR:', data)
-        console.log('📨 Current room:', selectedRoomRef.current?.id, 'Message room:', data.roomId)
-        console.log('📨 Current user:', currentUserRef.current?.name, 'Message from:', data.userName)
-        
-        // Only process if message is for the currently selected room
-        if (!selectedRoomRef.current || data.roomId !== selectedRoomRef.current.id) {
-          console.log('⏭️ Skipping message - different room')
-          return
-        }
-        
-        // Check if this is our own message (we already showed it optimistically)
-        const isOwnMessage = currentUserRef.current && data.userName === currentUserRef.current.name
-        
-        if (isOwnMessage) {
-          console.log('⏭️ Skipping own message (already shown optimistically)')
-          return
-        }
-        
-        // Add message from other users
-        console.log('✅ Adding message from other user')
-        setMessages(prev => {
-          const message = {
-            id: `msg-${Date.now()}-${Math.random()}`,
-            sender: data.userName || 'Unknown',
-            avatar: (data.userName || 'U').substring(0, 2).toUpperCase(),
-            text: data.message,
-            time: formatTime(new Date()),
-            isMine: false
-          }
-          return [...prev, message]
-        })
-      })
-    }
-  }, [selectedRoom, formatTime])
+  }, [selectedRoom])
 
   // Get current user from token
   useEffect(() => {
@@ -96,7 +61,7 @@ const MainAppUI = () => {
         id: user.id,
         name: user.userName || user.email?.split('@')[0] || 'User',
         email: user.email,
-        avatar: (user.userName || user.email?.split('@')[0] || 'U').substring(0, 2).toUpperCase()
+        avatar: (user.userName || user.email?.split('@')[0] || 'User').substring(0, 2).toUpperCase()
       }
       setCurrentUser(userData)
       currentUserRef.current = userData
@@ -120,7 +85,7 @@ const MainAppUI = () => {
       const formattedRooms = result.data.map(room => ({
         id: room.id,
         name: room.name,
-        avatar: room.name.substring(0, 2).toUpperCase(), // pfp
+        avatar: room.name.substring(0, 2).toUpperCase(),
         lastMessage: 'Click to load messages',
         time: formatTime(room.createdAt),
         unread: 0,
@@ -133,12 +98,124 @@ const MainAppUI = () => {
       }
     } else {
       console.log('⚠️ No rooms found or empty data')
-      // No rooms found - show empty state
       setRooms([])
       setSelectedRoom(null)
     }
     setLoading(false)
-  }, [])
+  }, [formatTime])
+
+  // Load messages for selected room (with optional silent mode)
+  const loadMessages = useCallback(async (roomId, silent = false) => {
+    console.log('📥 Loading messages for room:', roomId, silent ? '(silent)' : '')
+    if (!silent) {
+      setLoadingMessages(true)
+    }
+    const result = await messagesAPI.getByRoom(roomId)
+    console.log('📥 Messages API result:', result)
+    console.log('📥 Messages data:', result.data)
+    
+    if (result.success && result.data && result.data.length > 0) {
+      if (silent) {
+        // Silent mode: only append new messages we haven't seen
+        const newMessages = []
+        
+        result.data.forEach(msg => {
+          // Skip if we already have this message ID
+          if (processedMessageIdsRef.current.has(msg.id)) {
+            return
+          }
+          
+          // Track this message ID as processed
+          processedMessageIdsRef.current.add(msg.id)
+          
+          newMessages.push({
+            id: msg.id,
+            text: msg.text,
+            time: formatTime(msg.sentAt),
+            isMine: msg.userId === currentUser?.id,
+            sender: msg.userName || 'User',
+            avatar: (msg.userName || 'User').substring(0, 2).toUpperCase()
+          })
+        })
+        
+        if (newMessages.length > 0) {
+          console.log('📥 Silently adding', newMessages.length, 'new messages')
+          setMessages(prev => {
+            // Remove optimistic messages that match any new message
+            const withoutOptimistic = prev.filter(m => {
+              if (!m.id.startsWith('optimistic-')) return true
+              return !newMessages.some(nm => nm.text === m.text && nm.isMine)
+            })
+            return [...withoutOptimistic, ...newMessages]
+          })
+        }
+      } else {
+        // Normal mode: clear and reload all messages (for initial load)
+        processedMessageIdsRef.current.clear()
+        
+        const formattedMessages = result.data.map(msg => {
+          // Track this message ID as processed
+          processedMessageIdsRef.current.add(msg.id)
+          
+          return {
+            id: msg.id,
+            text: msg.text,
+            time: formatTime(msg.sentAt),
+            isMine: msg.userId === currentUser?.id,
+            sender: msg.userName || 'User',
+            avatar: (msg.userName || 'User').substring(0, 2).toUpperCase()
+          }
+        })
+        
+        console.log('📥 Formatted messages:', formattedMessages)
+        setMessages(formattedMessages)
+      }
+    } else {
+      if (!silent) {
+        // Clear processed IDs only on initial load
+        processedMessageIdsRef.current.clear()
+        
+        // Check if this is the official room and show welcome message
+        const currentRoom = rooms.find(r => r.id === roomId)
+        if (currentRoom && (currentRoom.name === 'Web Chat Official' || currentRoom.name === 'Official Web Chat')) {
+          setMessages([
+            { 
+              id: 'welcome-1', 
+              sender: 'Web Chat', 
+              avatar: 'WC', 
+              text: '🎉 Welcome to Web Chat Official!', 
+              time: '', 
+              isMine: false,
+              isSystem: true
+            },
+            { 
+              id: 'welcome-2', 
+              sender: 'Web Chat', 
+              avatar: 'WC', 
+              text: '🚀 Made by the best developers in the whole world!\n\n👨‍💻 Team:\n• Kyuuto09\n• axneo27\n• SlavaMokrynskyi\n• da2045\n• samoliukrustam123', 
+              time: '', 
+              isMine: false,
+              isSystem: true
+            },
+            { 
+              id: 'welcome-3', 
+              sender: 'Web Chat', 
+              avatar: 'WC', 
+              text: '✨ This is a real-time chat application powered by SignalR and React. Enjoy chatting!', 
+              time: '', 
+              isMine: false,
+              isSystem: true
+            }
+          ])
+        } else {
+          setMessages([])
+        }
+      }
+    }
+    if (!silent) {
+      setLoadingMessages(false)
+    }
+  }, [currentUser?.id, rooms, formatTime])
 
   // SignalR Connection
   useEffect(() => {
@@ -146,11 +223,39 @@ const MainAppUI = () => {
       if (!currentUser) return
 
       const connected = await signalRService.connect()
+      console.log('🔗 SignalR connection result:', connected)
 
       if (connected) {
-        // Note: ReceiveMessage listener is registered in selectedRoom useEffect
-        // to ensure fresh closure with current room state
-        
+        // Set up persistent message listener that works for all rooms
+        signalRService.onReceiveMessage((data) => {
+          // Only process if message is for the currently selected room
+          if (!selectedRoomRef.current || data.roomId !== selectedRoomRef.current.id) {
+            return
+          }
+
+          console.log('📨 SignalR message received:', data)
+
+          // If this is our own message, check optimistic messages
+          if (data.userName === currentUserRef.current?.name) {
+            const messageText = data.message?.trim()
+            if (messageText && optimisticMessagesRef.current.has(messageText)) {
+              console.log('📨 Received own message that was sent optimistically, reloading silently')
+              optimisticMessagesRef.current.delete(messageText)
+              // Silent reload to get real message from server with proper ID
+              if (selectedRoomRef.current) {
+                loadMessages(selectedRoomRef.current.id, true) // silent = true
+              }
+              return
+            }
+          }
+
+          // For messages from others, silently reload to ensure consistency
+          console.log('📨 Received message from other user, reloading silently')
+          if (selectedRoomRef.current) {
+            loadMessages(selectedRoomRef.current.id, true) // silent = true
+          }
+        })
+
         // Listen for room created events
         signalRService.onRoomCreated(() => {
           loadRooms() // Reload rooms list
@@ -181,101 +286,63 @@ const MainAppUI = () => {
 
     // Cleanup on unmount
     return () => {
+      if (signalRService.isConnected()) {
+        signalRService.offReceiveMessage()
+        signalRService.offRoomCreated()
+        signalRService.offUserJoined()
+        signalRService.offUserLeft()
+        signalRService.offRoomDeleted()
+      }
       signalRService.disconnect()
     }
-  }, [currentUser])
-
-  // Load messages for selected room
-  const loadMessages = useCallback(async (roomId) => { // optimized, function will not recreate on each render
-    console.log('📥 Loading messages for room:', roomId)
-    setLoadingMessages(true)
-    const result = await messagesAPI.getByRoom(roomId)
-    console.log('📥 Messages API result:', result)
-    console.log('📥 Messages data:', result.data)
-    
-    if (result.success && result.data && result.data.length > 0) {
-      const formattedMessages = result.data.map(msg => ({
-        id: msg.id,
-        text: msg.text,
-        time: formatTime(msg.sentAt),
-        isMine: msg.userId === currentUser?.id,
-        sender: msg.user?.userName || 'User',
-        avatar: (msg.user?.userName || 'U').substring(0, 2).toUpperCase()
-      }))
-      console.log('📥 Formatted messages:', formattedMessages)
-      setMessages(formattedMessages)
-    } else {
-      // Check if this is the official room and show welcome message
-      const currentRoom = rooms.find(r => r.id === roomId)
-      if (currentRoom && (currentRoom.name === 'Web Chat Official' || currentRoom.name === 'Official Web Chat')) {
-        setMessages([
-          { 
-            id: 'welcome-1', 
-            sender: 'Web Chat', 
-            avatar: 'WC', 
-            text: '🎉 Welcome to Web Chat Official!', 
-            time: '', 
-            isMine: false,
-            isSystem: true
-          },
-          { 
-            id: 'welcome-2', 
-            sender: 'Web Chat', 
-            avatar: 'WC', 
-            text: '🚀 Made by the best developers in the whole world!\n\n👨‍💻 Team:\n• Kyuuto09\n• axneo27\n• SlavaMokrynskyi\n• da2045\n• samoliukrustam123', 
-            time: '', 
-            isMine: false,
-            isSystem: true
-          },
-          { 
-            id: 'welcome-3', 
-            sender: 'Web Chat', 
-            avatar: 'WC', 
-            text: '✨ This is a real-time chat application powered by SignalR and React. Enjoy chatting!', 
-            time: '', 
-            isMine: false,
-            isSystem: true
-          }
-        ])
-      } else {
-        setMessages([])
-      }
-    }
-    setLoadingMessages(false)
-  }, [currentUser?.id, rooms, formatTime])
+  }, [currentUser, loadMessages, loadRooms])
 
   // Send message
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedRoom) return
 
-    const messageText = newMessage
+    const messageText = newMessage.trim()
     setNewMessage('') // Clear input immediately
+
+    // Track this as an optimistic message
+    const timestamp = Date.now()
+    optimisticMessagesRef.current.set(messageText, timestamp)
 
     // Add message optimistically to UI immediately
     const optimisticMessage = {
-      id: `temp-${Date.now()}-${Math.random()}`,
+      id: `optimistic-${timestamp}`,
       text: messageText,
       time: formatTime(new Date()),
       isMine: true,
       sender: currentUser?.name || 'Me',
       avatar: (currentUser?.name || 'ME').substring(0, 2).toUpperCase()
     }
+
     setMessages(prev => [...prev, optimisticMessage])
 
-    // Send via SignalR
-    const sentViaSignalR = await signalRService.sendMessage(messageText, selectedRoom.id)
-
-    if (!sentViaSignalR) {
+    try {
+      // Send via SignalR first
+      console.log('📤 Attempting to send via SignalR:', messageText)
+      await signalRService.sendMessage(messageText, selectedRoom.id)
+      console.log('✅ Message sent successfully via SignalR')
+      // SignalR will deliver the real message and replace the optimistic one
+    } catch (signalRError) {
+      console.log('⚠️ SignalR failed, using REST API fallback:', signalRError.message)
       // Fallback to REST API
-      console.log('⚠️ SignalR failed, using REST API fallback')
-      
       const result = await messagesAPI.send(selectedRoom.id, messageText)
+
       if (result.success) {
-        loadMessages(selectedRoom.id) // Reload to get real message
+        console.log('✅ Message sent successfully via REST API')
+        // Clean up optimistic tracking
+        optimisticMessagesRef.current.delete(messageText)
+        // Reload messages to get the real message from server
+        await loadMessages(selectedRoom.id)
       } else {
-        // Remove optimistic message if failed
+        console.error('❌ REST API also failed:', result.error)
+        // Remove optimistic message if both methods failed
+        optimisticMessagesRef.current.delete(messageText)
         setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
-        alert('Failed to send message')
+        alert('Failed to send message. Please try again.')
       }
     }
   }
@@ -290,9 +357,61 @@ const MainAppUI = () => {
   // Load messages when room changes
   useEffect(() => {
     if (selectedRoom) {
+      // Clear tracking when switching rooms
+      processedMessageIdsRef.current.clear()
+      optimisticMessagesRef.current.clear()
       loadMessages(selectedRoom.id)
     }
   }, [selectedRoom, loadMessages])
+
+  // Poll for new messages as fallback for SignalR
+  useEffect(() => {
+    if (!selectedRoom) return
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const result = await messagesAPI.getByRoom(selectedRoom.id)
+        if (result.success && result.data && result.data.length > 0) {
+          const newMessages = []
+          
+          result.data.forEach(msg => {
+            // Skip if we already have this message ID
+            if (processedMessageIdsRef.current.has(msg.id)) {
+              return
+            }
+            
+            // Add this message ID to processed set
+            processedMessageIdsRef.current.add(msg.id)
+            
+            newMessages.push({
+              id: msg.id,
+              text: msg.text,
+              time: formatTime(msg.sentAt),
+              isMine: msg.userId === currentUser?.id,
+              sender: msg.userName || 'User',
+              avatar: (msg.userName || 'User').substring(0, 2).toUpperCase()
+            })
+          })
+          
+          if (newMessages.length > 0) {
+            console.log('📊 Polling found', newMessages.length, 'new messages')
+            setMessages(prev => {
+              // Remove optimistic messages that match any new message text
+              const withoutOptimistic = prev.filter(m => {
+                if (!m.id.startsWith('optimistic-')) return true
+                return !newMessages.some(nm => nm.text === m.text && nm.isMine)
+              })
+              return [...withoutOptimistic, ...newMessages]
+            })
+          }
+        }
+      } catch (error) {
+        console.error('❌ Polling error:', error)
+      }
+    }, 3000) // Poll every 3 seconds
+
+    return () => clearInterval(pollInterval)
+  }, [selectedRoom, currentUser?.id, formatTime, messages])
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -407,7 +526,7 @@ const MainAppUI = () => {
           <div className="modal-content" style={{ maxWidth: '400px' }}>
             <h3 style={{ color: 'var(--brand-primary)', marginBottom: '16px' }}>Delete Room?</h3>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: '1.6' }}>
-              Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>\u201c{roomToDelete.name}\u201d</strong>? 
+              Are you sure you want to delete <strong style={{ color: 'var(--text-primary)' }}>"{roomToDelete.name}"</strong>? 
               This action cannot be undone and all messages will be permanently deleted.
             </p>
             <div className="modal-actions">
@@ -702,15 +821,27 @@ const MainAppUI = () => {
                   <span>Start the conversation!</span>
                 </div>
               ) : (
-                messages.map(msg => (
-                  <div key={msg.id} className={`message ${msg.isMine ? 'mine' : 'theirs'}`}>
-                    {!msg.isMine && <div className="message-avatar">{msg.avatar}</div>}
-                    <div className="message-content">
-                      <div className="message-bubble">{msg.text}</div>
-                      <span className="message-time">{msg.time}</span>
+                messages.map(msg => {
+                  // Prepare tooltip text with username and email if available
+                  const tooltipText = msg.isMine && currentUser?.email 
+                    ? `${msg.sender} (${currentUser.email})` 
+                    : msg.sender
+                    
+                  return (
+                    <div key={msg.id} className={`message ${msg.isMine ? 'mine' : 'theirs'}`} title={tooltipText}>
+                      {!msg.isMine && (
+                        <div className="message-avatar-container">
+                          <div className="message-avatar" title={tooltipText}>{msg.avatar}</div>
+                          <span className="message-avatar-name">{msg.sender}</span>
+                        </div>
+                      )}
+                      <div className="message-content">
+                        <div className="message-bubble">{msg.text}</div>
+                        <span className="message-time">{msg.time}</span>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
               <div ref={messagesEndRef} />
             </div>

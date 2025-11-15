@@ -1,5 +1,5 @@
 // API Base URL from environment variable or default
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7041/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 // Generic API request helper
 const apiRequest = async (endpoint, options = {}) => {
@@ -102,7 +102,6 @@ export const authAPI = {
     try {
       // Decode JWT token (simple base64 decode, not cryptographically secure but works for reading)
       const payload = JSON.parse(atob(token.split('.')[1]))
-      console.log('Decoded JWT payload:', payload) // Debug log
       return {
         id: payload.id || payload.sub,
         userName: payload.userName || payload.name,
