@@ -323,41 +323,27 @@ const MainAppUI = () => {
     try {
       // Send via SignalR first
       console.log('📤 Attempting to send via SignalR:', messageText)
-      const sentViaSignalR = await signalRService.sendMessage(messageText, selectedRoom.id)
+      await signalRService.sendMessage(messageText, selectedRoom.id)
+      console.log('✅ Message sent successfully via SignalR')
+      // SignalR will deliver the real message and replace the optimistic one
+    } catch (signalRError) {
+      console.log('⚠️ SignalR failed, using REST API fallback:', signalRError.message)
+      // Fallback to REST API
+      const result = await messagesAPI.send(selectedRoom.id, messageText)
 
-      if (sentViaSignalR) {
-        console.log('✅ Message sent successfully via SignalR')
-        // Wait a bit for SignalR callback to trigger, then silently reload to be sure
-        setTimeout(() => {
-          if (selectedRoomRef.current?.id === selectedRoom.id) {
-            loadMessages(selectedRoom.id, true) // silent = true
-          }
-        }, 500)
+      if (result.success) {
+        console.log('✅ Message sent successfully via REST API')
+        // Clean up optimistic tracking
+        optimisticMessagesRef.current.delete(messageText)
+        // Reload messages to get the real message from server
+        await loadMessages(selectedRoom.id)
       } else {
-        // Fallback to REST API
-        console.log('⚠️ SignalR failed, using REST API fallback')
-        const result = await messagesAPI.send(selectedRoom.id, messageText)
-
-        if (result.success) {
-          console.log('✅ Message sent successfully via REST API')
-          // Clean up optimistic tracking
-          optimisticMessagesRef.current.delete(messageText)
-          // Reload messages to get the real message from server
-          await loadMessages(selectedRoom.id)
-        } else {
-          console.error('❌ REST API also failed:', result.error)
-          // Remove optimistic message if both methods failed
-          optimisticMessagesRef.current.delete(messageText)
-          setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
-          alert('Failed to send message. Please try again.')
-        }
+        console.error('❌ REST API also failed:', result.error)
+        // Remove optimistic message if both methods failed
+        optimisticMessagesRef.current.delete(messageText)
+        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
+        alert('Failed to send message. Please try again.')
       }
-    } catch (error) {
-      console.error('❌ Unexpected error sending message:', error)
-      // Remove optimistic message on error
-      optimisticMessagesRef.current.delete(messageText)
-      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id))
-      alert('Failed to send message. Please check your connection.')
     }
   }
 
