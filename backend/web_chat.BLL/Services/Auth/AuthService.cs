@@ -4,7 +4,9 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using web_chat.BLL.Dtos.Auth;
 using web_chat.BLL.Settings;
+using web_chat.DAL;
 using web_chat.DAL.Entities;
+using web_chat.DAL.Seeders;
 using web_chat.DAL.Settings;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
@@ -17,11 +19,13 @@ namespace web_chat.BLL.Services.Auth
     {
         private readonly UserManager<UserEntity> _userManager;
         private readonly JwtSettings _jwtSettings;
+        private readonly AppDbContext _context;
 
-        public AuthService(UserManager<UserEntity> userManager, IOptions<JwtSettings> jwtOptions)
+        public AuthService(UserManager<UserEntity> userManager, IOptions<JwtSettings> jwtOptions, AppDbContext context)
         {
             _userManager = userManager;
             _jwtSettings = jwtOptions.Value;
+            _context = context;
         }
 
         public async Task<ServiceResponse> LoginAsync(LoginDto dto)
@@ -95,6 +99,21 @@ namespace web_chat.BLL.Services.Auth
 
             await _userManager.AddToRoleAsync(user, RoleSettings.RoleUser);
 
+            // Add user to the default "Web Chat Official" room
+            var defaultRoomId = await DefaultRoomSeeder.GetDefaultRoomIdAsync(_context);
+            if (!string.IsNullOrEmpty(defaultRoomId))
+            {
+                var userRoom = new UserRoomEntity
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    UserId = user.Id,
+                    RoomId = defaultRoomId,
+                    JoinedAt = DateTime.UtcNow
+                };
+                _context.UserRooms.Add(userRoom);
+                await _context.SaveChangesAsync();
+            }
+
             string token = await GenerateJwtTokenAsync(user);
             return new ServiceResponse
             {
@@ -116,7 +135,9 @@ namespace web_chat.BLL.Services.Auth
             {
                 new Claim("id", user.Id!),
                 new Claim("userName", user.UserName!),
-                new Claim("email", user.Email!)
+                new Claim("email", user.Email!),
+
+                new Claim(ClaimTypes.Name, user.UserName!), // For ChatHub
             };
 
             var userRoles = await _userManager.GetRolesAsync(user);

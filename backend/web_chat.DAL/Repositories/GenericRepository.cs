@@ -6,7 +6,7 @@ namespace web_chat.DAL.Repositories
     public class GenericRepository<TEntity> : IGenericRepository<TEntity>
         where TEntity : class, IBaseEntity
     {
-        private readonly AppDbContext _context;
+        protected readonly AppDbContext _context;
 
         public GenericRepository(AppDbContext context)
         {
@@ -18,14 +18,10 @@ namespace web_chat.DAL.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task DeleteAsync(string id)
+        public async Task DeleteAsync(TEntity entity)
         {
-            var entity = await _context.Set<TEntity>().FirstOrDefaultAsync(e => e.Id == id);
-            if (entity == null)
-            {
-                return;
-            }
             _context.Set<TEntity>().Remove(entity);
+            await _context.SaveChangesAsync();
         }
 
         public IQueryable<TEntity> GetAll()
@@ -37,16 +33,9 @@ namespace web_chat.DAL.Repositories
 
         public async Task<TEntity?> GetByIdAsync(string id)
         {
-            var entity = await _context
+            return await _context
                 .Set<TEntity>()
-                .AsNoTracking()
                 .FirstOrDefaultAsync(e => e.Id == id);
-            if (entity == null)
-            {
-                return null;
-            }
-
-            return entity;
         }
 
         public async Task UpdateAsync(TEntity entity)

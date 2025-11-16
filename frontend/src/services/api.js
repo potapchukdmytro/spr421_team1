@@ -1,5 +1,5 @@
 // API Base URL from environment variable or default
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7041/api'
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 // Generic API request helper
 const apiRequest = async (endpoint, options = {}) => {
@@ -102,7 +102,6 @@ export const authAPI = {
     try {
       // Decode JWT token (simple base64 decode, not cryptographically secure but works for reading)
       const payload = JSON.parse(atob(token.split('.')[1]))
-      console.log('Decoded JWT payload:', payload) // Debug log
       return {
         id: payload.id || payload.sub,
         userName: payload.userName || payload.name,
@@ -135,13 +134,28 @@ export const roomsAPI = {
 
   getById: async (id) => {
     return await apiRequest(`/rooms/${id}`)
+  },
+
+  update: async (roomId, name) => {
+    return await apiRequest('/rooms', {
+      method: 'PUT',
+      body: JSON.stringify({ id: roomId, name }),
+    })
+  },
+
+  delete: async (roomId) => {
+    return await apiRequest(`/rooms?roomId=${roomId}`, {
+      method: 'DELETE',
+    })
   }
 }
 
 // Messages API
 export const messagesAPI = {
   getByRoom: async (roomId) => {
-    return await apiRequest(`/rooms/${roomId}/messages`)
+    const user = authAPI.getCurrentUser()
+    const userId = user?.id || ''
+    return await apiRequest(`/rooms/messages?roomId=${roomId}&userId=${userId}`)
   },
 
   send: async (roomId, text) => {
